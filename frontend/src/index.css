@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans text-[#111111] bg-white;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-mimi-500 hover:bg-mimi-600 text-white font-semibold py-2 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply border border-mimi-500 text-mimi-500 hover:bg-mimi-50 font-semibold py-2 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .input-field {
+    @apply w-full border border-[#E5E7EB] rounded-xl px-3 py-2 text-[#111111] focus:outline-none focus:ring-2 focus:ring-mimi-500 focus:border-transparent bg-white;
+  }
+  .card {
+    @apply bg-white border border-[#E5E7EB] rounded-2xl shadow-sm p-6;
+  }
+}

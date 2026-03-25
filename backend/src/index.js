@@ -11,6 +11,7 @@ const productRoutes = require('./routes/products');
 const saleRoutes = require('./routes/sales');
 const reportRoutes = require('./routes/reports');
 const factoryOrderRoutes = require('./routes/factoryOrders');
+const cashClosingRoutes = require('./routes/cashClosings');
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/factory-orders', factoryOrderRoutes);
+app.use('/api/cash-closings', cashClosingRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'Mimí POS' }));
 

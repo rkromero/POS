@@ -14,6 +14,7 @@ import SalesHistory from './pages/local/SalesHistory'
 import LocalProducts from './pages/local/LocalProducts'
 import LocalReports from './pages/local/LocalReports'
 import PedidoFabrica from './pages/local/PedidoFabrica'
+import CierreCaja from './pages/local/CierreCaja'
 import AdminFactoryOrders from './pages/admin/FactoryOrders'
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="ventas" element={<SalesHistory />} />
           <Route path="productos" element={<LocalProducts />} />
           <Route path="reportes" element={<LocalReports />} />
+          <Route path="cierre-caja" element={<CierreCaja />} />
           <Route path="pedido-fabrica" element={<PedidoFabrica />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />

@@ -4,6 +4,7 @@ import Sidebar from '../../components/Sidebar'
 const localLinks = [
   { to: '/local', icon: '🛒', label: 'Caja / POS' },
   { to: '/local/ventas', icon: '📋', label: 'Historial de ventas' },
+  { to: '/local/cierre-caja', icon: '🔒', label: 'Cierre de Caja' },
   { to: '/local/pedido-fabrica', icon: '🏭', label: 'Pedido a Fábrica' },
   { to: '/local/productos', icon: '📦', label: 'Productos' },
   { to: '/local/reportes', icon: '📊', label: 'Reportes' },

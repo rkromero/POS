@@ -8,6 +8,7 @@ const adminLinks = [
   { to: '/admin/productos', icon: '📦', label: 'Productos' },
   { to: '/admin/categorias', icon: '🏷️', label: 'Categorías' },
   { to: '/admin/pedidos-fabrica', icon: '🏭', label: 'Pedidos a Fábrica' },
+  { to: '/admin/mayoristas', icon: '🏬', label: 'Mayoristas' },
 ]
 
 export default function AdminLayout() {

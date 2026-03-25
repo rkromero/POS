@@ -16,6 +16,8 @@ import LocalReports from './pages/local/LocalReports'
 import PedidoFabrica from './pages/local/PedidoFabrica'
 import CierreCaja from './pages/local/CierreCaja'
 import AdminFactoryOrders from './pages/admin/FactoryOrders'
+import WholesaleClients from './pages/admin/WholesaleClients'
+import WholesaleOrders from './pages/admin/WholesaleOrders'
 
 export default function App() {
   return (
@@ -29,6 +31,8 @@ export default function App() {
           <Route path="productos" element={<AdminProducts />} />
           <Route path="categorias" element={<AdminCategories />} />
           <Route path="pedidos-fabrica" element={<AdminFactoryOrders />} />
+          <Route path="mayoristas" element={<WholesaleClients />} />
+          <Route path="mayoristas/nuevo-pedido" element={<WholesaleOrders />} />
         </Route>
         <Route path="/local" element={<PrivateRoute role="local"><LocalLayout /></PrivateRoute>}>
           <Route index element={<POS />} />

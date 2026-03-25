@@ -13,6 +13,8 @@ import POS from './pages/local/POS'
 import SalesHistory from './pages/local/SalesHistory'
 import LocalProducts from './pages/local/LocalProducts'
 import LocalReports from './pages/local/LocalReports'
+import PedidoFabrica from './pages/local/PedidoFabrica'
+import AdminFactoryOrders from './pages/admin/FactoryOrders'
 
 export default function App() {
   return (
@@ -25,12 +27,14 @@ export default function App() {
           <Route path="usuarios" element={<AdminUsers />} />
           <Route path="productos" element={<AdminProducts />} />
           <Route path="categorias" element={<AdminCategories />} />
+          <Route path="pedidos-fabrica" element={<AdminFactoryOrders />} />
         </Route>
         <Route path="/local" element={<PrivateRoute role="local"><LocalLayout /></PrivateRoute>}>
           <Route index element={<POS />} />
           <Route path="ventas" element={<SalesHistory />} />
           <Route path="productos" element={<LocalProducts />} />
           <Route path="reportes" element={<LocalReports />} />
+          <Route path="pedido-fabrica" element={<PedidoFabrica />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

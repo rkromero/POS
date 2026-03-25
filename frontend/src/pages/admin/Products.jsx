@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
-const EMPTY = { nombre: '', descripcion: '', precio: '', categoria_id: '', stock: '0', activo: true }
+const EMPTY = { nombre: '', descripcion: '', precio: '', categoria_id: '', stock: '0', activo: true, unidad_medida: 'unidad' }
 const fmt = (v) => `$${parseFloat(v).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
 
 export default function AdminProducts() {
@@ -33,14 +33,14 @@ export default function AdminProducts() {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const openCreate = () => { setForm(EMPTY); setEditing(null); setShowModal(true) }
   const openEdit = (p) => {
-    setForm({ nombre: p.nombre, descripcion: p.descripcion || '', precio: p.precio, categoria_id: p.categoria_id || '', stock: p.stock, activo: p.activo })
+    setForm({ nombre: p.nombre, descripcion: p.descripcion || '', precio: p.precio, categoria_id: p.categoria_id || '', stock: p.stock, activo: p.activo, unidad_medida: p.unidad_medida || 'unidad' })
     setEditing(p.id)
     setShowModal(true)
   }
 
   const save = async (e) => {
     e.preventDefault()
-    const data = { ...form, precio: parseFloat(form.precio), stock: parseInt(form.stock), categoria_id: form.categoria_id || null }
+    const data = { ...form, precio: parseFloat(form.precio), stock: parseInt(form.stock), categoria_id: form.categoria_id || null, unidad_medida: form.unidad_medida }
     try {
       if (editing) { await api.put(`/products/${editing}`, data); toast.success('Producto actualizado') }
       else { await api.post('/products', data); toast.success('Producto creado') }
@@ -75,7 +75,7 @@ export default function AdminProducts() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-mimi-50">
-              {['Nombre','Categoría','Precio','Stock','Estado',''].map((h,i) => (
+              {['Nombre','Categoría','Unidad','Precio','Stock','Estado',''].map((h,i) => (
                 <th key={i} className={`py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444] ${i >= 4 ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr>
@@ -87,8 +87,15 @@ export default function AdminProducts() {
                 <td className="py-3 px-4">
                   {p.categoria_nombre && <span className="text-xs bg-mimi-50 text-mimi-500 px-2 py-1 rounded-full">{p.categoria_nombre}</span>}
                 </td>
-                <td className="py-3 px-4 text-right font-semibold">{fmt(p.precio)}</td>
-                <td className="py-3 px-4 text-right">{p.stock}</td>
+                <td className="py-3 px-4">
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${p.unidad_medida === 'kg' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>
+                    {p.unidad_medida === 'kg' ? 'Por kilo' : 'Unidad'}
+                  </span>
+                </td>
+                <td className="py-3 px-4 text-right font-semibold">
+                  {fmt(p.precio)}{p.unidad_medida === 'kg' ? <span className="text-xs text-[#444444] font-normal ml-1">/kg</span> : ''}
+                </td>
+                <td className="py-3 px-4 text-right">{p.unidad_medida === 'kg' ? '—' : p.stock}</td>
                 <td className="py-3 px-4">
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${p.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
                     {p.activo ? 'Activo' : 'Inactivo'}
@@ -120,9 +127,26 @@ export default function AdminProducts() {
             <form onSubmit={save} className="space-y-3">
               <div><label className="block text-sm font-medium mb-1">Nombre *</label><input className="input-field" value={form.nombre} onChange={e => set('nombre', e.target.value)} required /></div>
               <div><label className="block text-sm font-medium mb-1">Descripción</label><textarea className="input-field" rows={2} value={form.descripcion} onChange={e => set('descripcion', e.target.value)} /></div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Unidad de medida *</label>
+                <select className="input-field" value={form.unidad_medida} onChange={e => set('unidad_medida', e.target.value)}>
+                  <option value="unidad">Unidad (se vende por unidad)</option>
+                  <option value="kg">Por kilo (se vende por peso)</option>
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-sm font-medium mb-1">Precio *</label><input type="number" step="0.01" min="0" className="input-field" value={form.precio} onChange={e => set('precio', e.target.value)} required /></div>
-                <div><label className="block text-sm font-medium mb-1">Stock</label><input type="number" min="0" className="input-field" value={form.stock} onChange={e => set('stock', e.target.value)} /></div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    {form.unidad_medida === 'kg' ? 'Precio por kilo *' : 'Precio *'}
+                  </label>
+                  <input type="number" step="0.01" min="0" className="input-field" value={form.precio} onChange={e => set('precio', e.target.value)} required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    {form.unidad_medida === 'kg' ? 'Stock (kg)' : 'Stock'}
+                  </label>
+                  <input type="number" min="0" className="input-field" value={form.stock} onChange={e => set('stock', e.target.value)} disabled={form.unidad_medida === 'kg'} />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Categoría</label>

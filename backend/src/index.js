@@ -69,6 +69,11 @@ async function runMigrations() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    // Columna unidad_medida en products
+    await client.query(`
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS unidad_medida VARCHAR(10) DEFAULT 'unidad'
+    `);
     console.log('✅ Tablas de mayoristas verificadas/creadas');
   } catch (err) {
     console.error('⚠️ Error en migración automática:', err.message);

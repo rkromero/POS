@@ -41,13 +41,14 @@ async function getById(req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const { nombre, descripcion, precio, categoria_id, stock } = req.body;
+    const { nombre, descripcion, precio, categoria_id, stock, unidad_medida } = req.body;
     if (!nombre || precio === undefined) {
       return res.status(400).json({ error: 'nombre y precio son requeridos' });
     }
+    const um = ['unidad', 'kg'].includes(unidad_medida) ? unidad_medida : 'unidad';
     const result = await pool.query(
-      'INSERT INTO products (nombre, descripcion, precio, categoria_id, stock) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-      [nombre, descripcion || null, precio, categoria_id || null, stock || 0]
+      'INSERT INTO products (nombre, descripcion, precio, categoria_id, stock, unidad_medida) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+      [nombre, descripcion || null, precio, categoria_id || null, stock || 0, um]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { next(err); }
@@ -55,24 +56,25 @@ async function create(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const { nombre, descripcion, precio, categoria_id, stock, activo } = req.body;
+    const { nombre, descripcion, precio, categoria_id, stock, activo, unidad_medida } = req.body;
     const isAdmin = req.user?.role === 'admin';
     let result;
 
     if (!isAdmin) {
-      // Usuarios de local solo pueden editar precio y stock
       result = await pool.query(
         'UPDATE products SET precio=COALESCE($1,precio), stock=COALESCE($2,stock) WHERE id=$3 RETURNING *',
         [precio, stock, req.params.id]
       );
     } else {
+      const um = ['unidad', 'kg'].includes(unidad_medida) ? unidad_medida : null;
       result = await pool.query(
         `UPDATE products SET
           nombre=COALESCE($1,nombre), descripcion=COALESCE($2,descripcion),
           precio=COALESCE($3,precio), categoria_id=$4,
-          stock=COALESCE($5,stock), activo=COALESCE($6,activo)
-        WHERE id=$7 RETURNING *`,
-        [nombre, descripcion, precio, categoria_id || null, stock, activo, req.params.id]
+          stock=COALESCE($5,stock), activo=COALESCE($6,activo),
+          unidad_medida=COALESCE($7,unidad_medida)
+        WHERE id=$8 RETURNING *`,
+        [nombre, descripcion, precio, categoria_id || null, stock, activo, um, req.params.id]
       );
     }
     if (!result.rows[0]) return res.status(404).json({ error: 'Producto no encontrado' });

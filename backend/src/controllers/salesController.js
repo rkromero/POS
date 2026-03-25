@@ -67,20 +67,23 @@ async function create(req, res, next) {
     const validatedItems = [];
     for (const item of items) {
       const prod = await client.query(
-        'SELECT id, precio, stock FROM products WHERE id=$1 AND activo=TRUE FOR UPDATE',
+        'SELECT id, precio, stock, unidad_medida FROM products WHERE id=$1 AND activo=TRUE FOR UPDATE',
         [item.product_id]
       );
       if (!prod.rows[0]) {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: `Producto ${item.product_id} no encontrado o inactivo` });
       }
-      if (prod.rows[0].stock < item.cantidad) {
+      const esKg = prod.rows[0].unidad_medida === 'kg';
+      if (!esKg && prod.rows[0].stock < item.cantidad) {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: `Stock insuficiente para el producto ${item.product_id}` });
       }
-      const subtotal = parseFloat(prod.rows[0].precio) * item.cantidad;
+      const precioBase = parseFloat(prod.rows[0].precio);
+      // Para kg: cantidad viene en gramos, precio es por kg
+      const subtotal = esKg ? precioBase * (item.cantidad / 1000) : precioBase * item.cantidad;
       total += subtotal;
-      validatedItems.push({ ...item, precio_unitario: prod.rows[0].precio, subtotal });
+      validatedItems.push({ ...item, precio_unitario: prod.rows[0].precio, subtotal, esKg });
     }
 
     const saleResult = await client.query(
@@ -95,7 +98,9 @@ async function create(req, res, next) {
         'INSERT INTO sale_items (sale_id, product_id, cantidad, precio_unitario, subtotal) VALUES ($1,$2,$3,$4,$5)',
         [sale.id, item.product_id, item.cantidad, item.precio_unitario, item.subtotal]
       );
-      await client.query('UPDATE products SET stock = stock - $1 WHERE id = $2', [item.cantidad, item.product_id]);
+      if (!item.esKg) {
+        await client.query('UPDATE products SET stock = stock - $1 WHERE id = $2', [item.cantidad, item.product_id]);
+      }
     }
 
     await client.query('COMMIT');

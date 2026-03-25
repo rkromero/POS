@@ -23,6 +23,8 @@ export default function POS() {
   const [ticket, setTicket] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [clienteForm, setClienteForm] = useState({ nombre: '', email: '', whatsapp: '' })
+  const [weightPopup, setWeightPopup] = useState(null)
+  const [gramosInput, setGramosInput] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -45,6 +47,11 @@ export default function POS() {
   })
 
   const addToCart = (product) => {
+    if (product.unidad_medida === 'kg') {
+      setGramosInput('')
+      setWeightPopup(product)
+      return
+    }
     const existing = cart.find(i => i.product_id === product.id)
     if (existing && existing.cantidad >= product.stock) {
       toast.error(`Stock máximo disponible: ${product.stock}`)
@@ -53,8 +60,36 @@ export default function POS() {
     setCart(prev => {
       const ex = prev.find(i => i.product_id === product.id)
       if (ex) return prev.map(i => i.product_id === product.id ? { ...i, cantidad: i.cantidad + 1 } : i)
-      return [...prev, { product_id: product.id, nombre: product.nombre, precio_unitario: parseFloat(product.precio), cantidad: 1 }]
+      return [...prev, { product_id: product.id, nombre: product.nombre, precio_unitario: parseFloat(product.precio), cantidad: 1, es_peso: false }]
     })
+  }
+
+  const addWeightToCart = () => {
+    const gramos = parseInt(gramosInput)
+    if (!gramos || gramos <= 0) { toast.error('Ingresá una cantidad válida de gramos'); return }
+    const p = weightPopup
+    const precioTotal = parseFloat(p.precio) * gramos / 1000
+    setCart(prev => {
+      const ex = prev.find(i => i.product_id === p.id && i.es_peso)
+      if (ex) {
+        return prev.map(i =>
+          i.product_id === p.id && i.es_peso
+            ? { ...i, gramos, precio_unitario: parseFloat(p.precio), subtotal: precioTotal }
+            : i
+        )
+      }
+      return [...prev, {
+        product_id: p.id,
+        nombre: p.nombre,
+        precio_unitario: parseFloat(p.precio),
+        cantidad: gramos,
+        es_peso: true,
+        gramos,
+        subtotal: precioTotal,
+      }]
+    })
+    setWeightPopup(null)
+    setGramosInput('')
   }
 
   const updateQty = (product_id, delta) => {
@@ -75,7 +110,8 @@ export default function POS() {
   const removeItem = (product_id) => setCart(prev => prev.filter(i => i.product_id !== product_id))
   const clearCart = () => { setCart([]); setMetodoPago('efectivo') }
 
-  const total = cart.reduce((s, i) => s + i.precio_unitario * i.cantidad, 0)
+  const itemTotal = (i) => i.es_peso ? i.subtotal : i.precio_unitario * i.cantidad
+  const total = cart.reduce((s, i) => s + itemTotal(i), 0)
 
   const openModal = () => {
     if (cart.length === 0) return toast.error('Agregá al menos un producto')
@@ -92,7 +128,7 @@ export default function POS() {
         cliente_email: cliente.email || null,
         cliente_whatsapp: cliente.whatsapp || null,
         metodo_pago: metodoPago,
-        items: cart.map(i => ({ product_id: i.product_id, cantidad: i.cantidad })),
+        items: cart.map(i => ({ product_id: i.product_id, cantidad: i.es_peso ? i.gramos : i.cantidad })),
       })
       setTicket(res.data)
       clearCart()
@@ -149,8 +185,13 @@ export default function POS() {
                   </span>
                 )}
                 <p className="font-semibold text-[#111111] text-sm leading-snug">{p.nombre}</p>
-                <p className="text-mimi-500 font-bold text-base mt-1">{fmt(p.precio)}</p>
-                <p className="text-xs text-[#444444] mt-1">Stock: {p.stock}</p>
+                <p className="text-mimi-500 font-bold text-base mt-1">
+                  {fmt(p.precio)}{p.unidad_medida === 'kg' && <span className="text-xs font-normal text-[#444444] ml-1">/kg</span>}
+                </p>
+                {p.unidad_medida === 'kg'
+                  ? <p className="text-xs text-orange-500 mt-1 font-medium">Por peso</p>
+                  : <p className="text-xs text-[#444444] mt-1">Stock: {p.stock}</p>
+                }
               </button>
             ))}
             {filtered.length === 0 && (
@@ -178,16 +219,28 @@ export default function POS() {
               <p className="text-sm text-[#444444] text-center py-8">El carrito está vacío</p>
             )}
             {cart.map(item => (
-              <div key={item.product_id} className="flex items-center gap-2 border border-[#E5E7EB] rounded-xl p-2.5">
+              <div key={`${item.product_id}-${item.es_peso ? item.gramos : 'u'}`} className="flex items-center gap-2 border border-[#E5E7EB] rounded-xl p-2.5">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-[#111111] truncate leading-tight">{item.nombre}</p>
-                  <p className="text-xs text-mimi-500 font-medium mt-0.5">{fmt(item.precio_unitario)}</p>
+                  {item.es_peso
+                    ? <p className="text-xs text-orange-500 font-medium mt-0.5">{item.gramos}g · {fmt(item.precio_unitario)}/kg</p>
+                    : <p className="text-xs text-mimi-500 font-medium mt-0.5">{fmt(item.precio_unitario)}</p>
+                  }
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={() => updateQty(item.product_id, -1)} className="w-5 h-5 rounded-lg bg-mimi-50 text-mimi-500 font-bold text-xs flex items-center justify-center hover:bg-mimi-100">−</button>
-                  <span className="w-5 text-center text-xs font-bold">{item.cantidad}</span>
-                  <button onClick={() => updateQty(item.product_id, 1)} className="w-5 h-5 rounded-lg bg-mimi-50 text-mimi-500 font-bold text-xs flex items-center justify-center hover:bg-mimi-100">+</button>
-                </div>
+                {item.es_peso ? (
+                  <button
+                    onClick={() => { setGramosInput(String(item.gramos)); setWeightPopup(products.find(p => p.id === item.product_id)) }}
+                    className="text-xs text-orange-500 hover:underline flex-shrink-0"
+                  >
+                    ✎
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => updateQty(item.product_id, -1)} className="w-5 h-5 rounded-lg bg-mimi-50 text-mimi-500 font-bold text-xs flex items-center justify-center hover:bg-mimi-100">−</button>
+                    <span className="w-5 text-center text-xs font-bold">{item.cantidad}</span>
+                    <button onClick={() => updateQty(item.product_id, 1)} className="w-5 h-5 rounded-lg bg-mimi-50 text-mimi-500 font-bold text-xs flex items-center justify-center hover:bg-mimi-100">+</button>
+                  </div>
+                )}
                 <button onClick={() => removeItem(item.product_id)} className="text-red-400 hover:text-red-600 text-xs ml-0.5">✕</button>
               </div>
             ))}
@@ -197,9 +250,11 @@ export default function POS() {
           {cart.length > 0 && (
             <div className="px-3 pb-2 border-t border-[#E5E7EB] pt-2 space-y-0.5">
               {cart.map(item => (
-                <div key={item.product_id} className="flex justify-between text-xs text-[#444444]">
-                  <span className="truncate max-w-[130px]">{item.nombre} ×{item.cantidad}</span>
-                  <span className="font-medium">{fmt(item.precio_unitario * item.cantidad)}</span>
+                <div key={`sub-${item.product_id}-${item.es_peso ? item.gramos : 'u'}`} className="flex justify-between text-xs text-[#444444]">
+                  <span className="truncate max-w-[130px]">
+                    {item.nombre} {item.es_peso ? `${item.gramos}g` : `×${item.cantidad}`}
+                  </span>
+                  <span className="font-medium">{fmt(itemTotal(item))}</span>
                 </div>
               ))}
               <div className="flex justify-between font-bold text-sm text-[#111111] pt-1 border-t border-[#E5E7EB] mt-1">
@@ -264,6 +319,54 @@ export default function POS() {
             <button onClick={() => setShowModal(false)} className="w-full mt-3 text-xs text-[#444444] hover:text-[#111111]">
               Cancelar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Popup gramos */}
+      {weightPopup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-bold text-[#111111] mb-0.5">{weightPopup.nombre}</h2>
+            <p className="text-sm text-[#444444] mb-5">Precio: {fmt(weightPopup.precio)} por kilo</p>
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-[#111111] mb-1">Gramos</label>
+              <input
+                className="input-field text-2xl font-bold text-center"
+                type="number"
+                min="1"
+                step="1"
+                autoFocus
+                placeholder="350"
+                value={gramosInput}
+                onChange={e => setGramosInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addWeightToCart()}
+              />
+            </div>
+            {gramosInput > 0 && (
+              <div className="bg-mimi-50 rounded-xl p-3 mb-4 text-center">
+                <p className="text-xs text-[#444444] mb-0.5">Precio a cobrar</p>
+                <p className="text-2xl font-bold text-mimi-500">
+                  {fmt(parseFloat(weightPopup.precio) * parseInt(gramosInput) / 1000)}
+                </p>
+                <p className="text-xs text-[#444444] mt-0.5">{gramosInput}g</p>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={addWeightToCart}
+                disabled={!gramosInput || parseInt(gramosInput) <= 0}
+                className="btn-primary flex-1 py-3"
+              >
+                Agregar al carrito
+              </button>
+              <button
+                onClick={() => { setWeightPopup(null); setGramosInput('') }}
+                className="btn-secondary flex-1 py-3"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

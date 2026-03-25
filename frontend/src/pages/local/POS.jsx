@@ -18,10 +18,11 @@ export default function POS() {
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('')
   const [cart, setCart] = useState([])
-  const [cliente, setCliente] = useState({ nombre: '', email: '', whatsapp: '' })
   const [metodoPago, setMetodoPago] = useState('efectivo')
   const [loading, setLoading] = useState(false)
   const [ticket, setTicket] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+  const [clienteForm, setClienteForm] = useState({ nombre: '', email: '', whatsapp: '' })
 
   useEffect(() => {
     async function load() {
@@ -72,17 +73,22 @@ export default function POS() {
   }
 
   const removeItem = (product_id) => setCart(prev => prev.filter(i => i.product_id !== product_id))
-  const clearCart = () => { setCart([]); setCliente({ nombre: '', email: '', whatsapp: '' }); setMetodoPago('efectivo') }
+  const clearCart = () => { setCart([]); setMetodoPago('efectivo') }
 
   const total = cart.reduce((s, i) => s + i.precio_unitario * i.cantidad, 0)
 
-  const handleConfirm = async () => {
-    if (!cliente.nombre.trim()) return toast.error('El nombre del cliente es requerido')
+  const openModal = () => {
     if (cart.length === 0) return toast.error('Agregá al menos un producto')
+    setClienteForm({ nombre: '', email: '', whatsapp: '' })
+    setShowModal(true)
+  }
+
+  const submitSale = async (cliente) => {
+    setShowModal(false)
     setLoading(true)
     try {
       const res = await api.post('/sales', {
-        cliente_nombre: cliente.nombre.trim(),
+        cliente_nombre: cliente.nombre,
         cliente_email: cliente.email || null,
         cliente_whatsapp: cliente.whatsapp || null,
         metodo_pago: metodoPago,
@@ -96,6 +102,15 @@ export default function POS() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleGuardar = () => {
+    if (!clienteForm.nombre.trim()) return toast.error('El nombre del cliente es requerido')
+    submitSale({ nombre: clienteForm.nombre.trim(), email: clienteForm.email, whatsapp: clienteForm.whatsapp })
+  }
+
+  const handleInvitado = () => {
+    submitSale({ nombre: 'Invitado', email: null, whatsapp: null })
   }
 
   return (
@@ -194,16 +209,8 @@ export default function POS() {
             </div>
           )}
 
-          {/* Cliente */}
-          <div className="px-3 pb-2 border-t border-[#E5E7EB] pt-3 space-y-2">
-            <p className="text-xs font-semibold text-[#444444] uppercase tracking-wide">Datos del cliente</p>
-            <input className="input-field text-xs py-1.5" placeholder="Nombre *" value={cliente.nombre} onChange={e => setCliente(c => ({...c, nombre: e.target.value}))} />
-            <input className="input-field text-xs py-1.5" placeholder="Email (opcional)" type="email" value={cliente.email} onChange={e => setCliente(c => ({...c, email: e.target.value}))} />
-            <input className="input-field text-xs py-1.5" placeholder="WhatsApp (opcional)" value={cliente.whatsapp} onChange={e => setCliente(c => ({...c, whatsapp: e.target.value}))} />
-          </div>
-
           {/* Pago */}
-          <div className="px-3 pb-3">
+          <div className="px-3 pb-3 border-t border-[#E5E7EB] pt-3">
             <p className="text-xs font-semibold text-[#444444] uppercase tracking-wide mb-1.5">Método de pago</p>
             <select className="input-field text-xs py-1.5" value={metodoPago} onChange={e => setMetodoPago(e.target.value)}>
               {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
@@ -211,12 +218,55 @@ export default function POS() {
           </div>
 
           <div className="px-3 pb-4">
-            <button onClick={handleConfirm} disabled={loading || cart.length === 0} className="btn-primary w-full py-3 text-base">
+            <button onClick={openModal} disabled={loading || cart.length === 0} className="btn-primary w-full py-3 text-base">
               {loading ? 'Registrando...' : '✓ Confirmar venta'}
             </button>
           </div>
         </div>
       </div>
+
+      {/* Modal datos del cliente */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-bold text-[#111111] mb-1">Datos del cliente</h2>
+            <p className="text-sm text-[#444444] mb-4">Ingresá los datos o continuá como invitado.</p>
+            <div className="space-y-3">
+              <input
+                className="input-field text-sm"
+                placeholder="Nombre *"
+                value={clienteForm.nombre}
+                onChange={e => setClienteForm(f => ({ ...f, nombre: e.target.value }))}
+                autoFocus
+              />
+              <input
+                className="input-field text-sm"
+                placeholder="Email (opcional)"
+                type="email"
+                value={clienteForm.email}
+                onChange={e => setClienteForm(f => ({ ...f, email: e.target.value }))}
+              />
+              <input
+                className="input-field text-sm"
+                placeholder="WhatsApp (opcional)"
+                value={clienteForm.whatsapp}
+                onChange={e => setClienteForm(f => ({ ...f, whatsapp: e.target.value }))}
+              />
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={handleInvitado} className="flex-1 py-2.5 rounded-xl border border-[#E5E7EB] text-sm font-semibold text-[#444444] hover:bg-gray-50">
+                Invitado
+              </button>
+              <button onClick={handleGuardar} className="flex-1 py-2.5 rounded-xl bg-mimi-500 text-white text-sm font-semibold hover:bg-mimi-600">
+                Guardar
+              </button>
+            </div>
+            <button onClick={() => setShowModal(false)} className="w-full mt-3 text-xs text-[#444444] hover:text-[#111111]">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {ticket && <Ticket sale={ticket} onClose={() => setTicket(null)} />}
     </div>

@@ -13,6 +13,7 @@ const reportRoutes = require('./routes/reports');
 const factoryOrderRoutes = require('./routes/factoryOrders');
 const cashClosingRoutes = require('./routes/cashClosings');
 const gastosRoutes = require('./routes/gastos');
+const mermasRoutes = require('./routes/mermas');
 const wholesaleClientRoutes = require('./routes/wholesaleClients');
 const wholesaleOrderRoutes = require('./routes/wholesaleOrders');
 const wholesalePaymentRoutes = require('./routes/wholesalePayments');
@@ -93,6 +94,26 @@ async function runMigrations() {
         END IF;
       END $$
     `);
+    // Tablas de merma de productos
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS mermas (
+        id SERIAL PRIMARY KEY,
+        local_id INTEGER NOT NULL REFERENCES locals(id),
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        motivo VARCHAR(20) NOT NULL DEFAULT 'Desperfecto'
+          CHECK (motivo IN ('Desperfecto','Vencimiento','Otro')),
+        notas TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS merma_items (
+        id SERIAL PRIMARY KEY,
+        merma_id INTEGER NOT NULL REFERENCES mermas(id) ON DELETE CASCADE,
+        product_id INTEGER NOT NULL REFERENCES products(id),
+        cantidad NUMERIC(10,2) NOT NULL
+      )
+    `);
     // Tabla de gastos del local
     await client.query(`
       CREATE TABLE IF NOT EXISTS gastos (
@@ -145,6 +166,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/factory-orders', factoryOrderRoutes);
 app.use('/api/cash-closings', cashClosingRoutes);
 app.use('/api/gastos', gastosRoutes);
+app.use('/api/mermas', mermasRoutes);
 app.use('/api/wholesale-clients', wholesaleClientRoutes);
 app.use('/api/wholesale-orders', wholesaleOrderRoutes);
 app.use('/api/wholesale-payments', wholesalePaymentRoutes);

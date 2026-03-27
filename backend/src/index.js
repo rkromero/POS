@@ -77,6 +77,16 @@ async function runMigrations() {
       ALTER TABLE products
       ADD COLUMN IF NOT EXISTS unidad_medida VARCHAR(10) DEFAULT 'unidad'
     `);
+    // Precio mayorista en products
+    await client.query(`
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS precio_mayorista NUMERIC(10,2)
+    `);
+    // Tipo de cliente en wholesale_clients
+    await client.query(`
+      ALTER TABLE wholesale_clients
+      ADD COLUMN IF NOT EXISTS tipo_cliente VARCHAR(30) DEFAULT 'mayorista'
+    `);
     // Migración cierre de caja multi-turno: columnas de montos declarados por cajera
     await client.query(`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS declarado_efectivo NUMERIC(12,2) DEFAULT 0`);
     await client.query(`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS declarado_debito NUMERIC(12,2) DEFAULT 0`);

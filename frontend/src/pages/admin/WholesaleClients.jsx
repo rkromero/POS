@@ -145,7 +145,12 @@ export default function WholesaleClients() {
                 className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
               >
                 <div>
-                  <p className="font-bold text-[#111111]">{c.nombre}</p>
+                  <p className="font-bold text-[#111111]">
+                    {c.nombre}
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium ml-2">
+                      {c.tipo_cliente || 'mayorista'}
+                    </span>
+                  </p>
                   <p className="text-sm text-[#444444]">
                     {c.telefono || '—'}{c.email ? ` · ${c.email}` : ''}
                   </p>

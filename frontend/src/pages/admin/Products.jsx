@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
-const EMPTY = { nombre: '', descripcion: '', precio: '', categoria_id: '', stock: '0', activo: true, unidad_medida: 'unidad' }
+const EMPTY = { nombre: '', descripcion: '', precio: '', categoria_id: '', stock: '0', activo: true, unidad_medida: 'unidad', precio_mayorista: '' }
 const fmt = (v) => `$${parseFloat(v).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
 
 export default function AdminProducts() {
@@ -33,14 +33,14 @@ export default function AdminProducts() {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const openCreate = () => { setForm(EMPTY); setEditing(null); setShowModal(true) }
   const openEdit = (p) => {
-    setForm({ nombre: p.nombre, descripcion: p.descripcion || '', precio: p.precio, categoria_id: p.categoria_id || '', stock: p.stock, activo: p.activo, unidad_medida: p.unidad_medida || 'unidad' })
+    setForm({ nombre: p.nombre, descripcion: p.descripcion || '', precio: p.precio, categoria_id: p.categoria_id || '', stock: p.stock, activo: p.activo, unidad_medida: p.unidad_medida || 'unidad', precio_mayorista: p.precio_mayorista || '' })
     setEditing(p.id)
     setShowModal(true)
   }
 
   const save = async (e) => {
     e.preventDefault()
-    const data = { ...form, precio: parseFloat(form.precio), stock: parseInt(form.stock), categoria_id: form.categoria_id || null, unidad_medida: form.unidad_medida }
+    const data = { ...form, precio: parseFloat(form.precio), stock: parseInt(form.stock), categoria_id: form.categoria_id || null, unidad_medida: form.unidad_medida, precio_mayorista: form.precio_mayorista ? parseFloat(form.precio_mayorista) : null }
     try {
       if (editing) { await api.put(`/products/${editing}`, data); toast.success('Producto actualizado') }
       else { await api.post('/products', data); toast.success('Producto creado') }
@@ -75,7 +75,7 @@ export default function AdminProducts() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-mimi-50">
-              {['Nombre','Categoría','Unidad','Precio','Stock','Estado',''].map((h,i) => (
+              {['Nombre','Categoría','Unidad','Precio C.F.','Precio May.','Stock','Estado',''].map((h,i) => (
                 <th key={i} className={`py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444] ${i >= 4 ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr>
@@ -94,6 +94,9 @@ export default function AdminProducts() {
                 </td>
                 <td className="py-3 px-4 text-right font-semibold">
                   {fmt(p.precio)}{p.unidad_medida === 'kg' ? <span className="text-xs text-[#444444] font-normal ml-1">/kg</span> : ''}
+                </td>
+                <td className="py-3 px-4 text-right font-semibold text-blue-700">
+                  {p.precio_mayorista ? fmt(p.precio_mayorista) : <span className="text-gray-400 text-xs">—</span>}
                 </td>
                 <td className="py-3 px-4 text-right">{p.unidad_medida === 'kg' ? '—' : p.stock}</td>
                 <td className="py-3 px-4">
@@ -137,7 +140,7 @@ export default function AdminProducts() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    {form.unidad_medida === 'kg' ? 'Precio por kilo *' : 'Precio *'}
+                    {form.unidad_medida === 'kg' ? 'Precio por kilo (CF) *' : 'Precio Cons. Final *'}
                   </label>
                   <input type="number" step="0.01" min="0" className="input-field" value={form.precio} onChange={e => set('precio', e.target.value)} required />
                 </div>
@@ -147,6 +150,12 @@ export default function AdminProducts() {
                   </label>
                   <input type="number" min="0" className="input-field" value={form.stock} onChange={e => set('stock', e.target.value)} disabled={form.unidad_medida === 'kg'} />
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Precio Mayorista {form.unidad_medida === 'kg' ? '(por kilo)' : ''}
+                </label>
+                <input type="number" step="0.01" min="0" className="input-field" value={form.precio_mayorista} onChange={e => set('precio_mayorista', e.target.value)} placeholder="Opcional" />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Categoría</label>

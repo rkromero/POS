@@ -41,14 +41,14 @@ async function getById(req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const { nombre, descripcion, precio, categoria_id, stock, unidad_medida } = req.body;
+    const { nombre, descripcion, precio, categoria_id, stock, unidad_medida, precio_mayorista } = req.body;
     if (!nombre || precio === undefined) {
       return res.status(400).json({ error: 'nombre y precio son requeridos' });
     }
     const um = ['unidad', 'kg'].includes(unidad_medida) ? unidad_medida : 'unidad';
     const result = await pool.query(
-      'INSERT INTO products (nombre, descripcion, precio, categoria_id, stock, unidad_medida) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-      [nombre, descripcion || null, precio, categoria_id || null, stock || 0, um]
+      'INSERT INTO products (nombre, descripcion, precio, categoria_id, stock, unidad_medida, precio_mayorista) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+      [nombre, descripcion || null, precio, categoria_id || null, stock || 0, um, precio_mayorista || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { next(err); }
@@ -56,7 +56,7 @@ async function create(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const { nombre, descripcion, precio, categoria_id, stock, activo, unidad_medida } = req.body;
+    const { nombre, descripcion, precio, categoria_id, stock, activo, unidad_medida, precio_mayorista } = req.body;
     const isAdmin = req.user?.role === 'admin';
     let result;
 
@@ -72,9 +72,10 @@ async function update(req, res, next) {
           nombre=COALESCE($1,nombre), descripcion=COALESCE($2,descripcion),
           precio=COALESCE($3,precio), categoria_id=$4,
           stock=COALESCE($5,stock), activo=COALESCE($6,activo),
-          unidad_medida=COALESCE($7,unidad_medida)
-        WHERE id=$8 RETURNING *`,
-        [nombre, descripcion, precio, categoria_id || null, stock, activo, um, req.params.id]
+          unidad_medida=COALESCE($7,unidad_medida),
+          precio_mayorista=COALESCE($8,precio_mayorista)
+        WHERE id=$9 RETURNING *`,
+        [nombre, descripcion, precio, categoria_id || null, stock, activo, um, precio_mayorista || null, req.params.id]
       );
     }
     if (!result.rows[0]) return res.status(404).json({ error: 'Producto no encontrado' });

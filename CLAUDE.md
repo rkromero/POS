@@ -2,6 +2,7 @@
 
 ## Behavioral Rules (Always Enforced)
 
+- ALWAYS use ruv-flow agents (via the Agent tool) for ALL tasks — no exceptions. Even for simple edits, spawn at least a `coder` agent. Direct tool use (Read/Edit/Write/Bash) is only allowed when an agent explicitly delegates back.
 - Do what has been asked; nothing more, nothing less
 - NEVER create files unless they're absolutely necessary for achieving your goal
 - ALWAYS prefer editing an existing file to creating a new one

@@ -21,6 +21,7 @@ import AdminFactoryOrders from './pages/admin/FactoryOrders'
 import WholesaleClients from './pages/admin/WholesaleClients'
 import WholesaleOrders from './pages/admin/WholesaleOrders'
 import Fidelizacion from './pages/admin/Fidelizacion'
+import MisPuntos from './pages/MisPuntos'
 
 export default function App() {
   return (
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="merma" element={<MermaProductos />} />
           <Route path="pedido-fabrica" element={<PedidoFabrica />} />
         </Route>
+        <Route path="/mis-puntos" element={<MisPuntos />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </AuthProvider>

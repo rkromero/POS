@@ -74,6 +74,24 @@ async function runMigrations() {
       ALTER TABLE products
       ADD COLUMN IF NOT EXISTS unidad_medida VARCHAR(10) DEFAULT 'unidad'
     `);
+    // Migración cierre de caja multi-turno: columnas de montos declarados por cajera
+    await client.query(`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS declarado_efectivo NUMERIC(12,2) DEFAULT 0`);
+    await client.query(`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS declarado_debito NUMERIC(12,2) DEFAULT 0`);
+    await client.query(`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS declarado_credito NUMERIC(12,2) DEFAULT 0`);
+    await client.query(`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS declarado_transferencia NUMERIC(12,2) DEFAULT 0`);
+    await client.query(`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS declarado_total NUMERIC(12,2) DEFAULT 0`);
+    // Cambiar constraint único de (local_id, fecha) a (local_id, fecha, user_id) para multi-turno
+    await client.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'cash_closings_local_id_fecha_key') THEN
+          ALTER TABLE cash_closings DROP CONSTRAINT cash_closings_local_id_fecha_key;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'cash_closings_local_id_fecha_user_id_key') THEN
+          ALTER TABLE cash_closings ADD CONSTRAINT cash_closings_local_id_fecha_user_id_key UNIQUE (local_id, fecha, user_id);
+        END IF;
+      END $$
+    `);
     console.log('✅ Tablas de mayoristas verificadas/creadas');
   } catch (err) {
     console.error('⚠️ Error en migración automática:', err.message);

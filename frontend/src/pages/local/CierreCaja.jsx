@@ -19,7 +19,7 @@ const METODOS = [
 
 export default function CierreCaja() {
   const { user } = useAuth()
-  const isAdmin = user?.role === 'administrador'
+  const isAdmin = user?.role === 'admin'
 
   const [fecha, setFecha] = useState(() => new Date().toISOString().split('T')[0])
   const [data, setData] = useState(null)

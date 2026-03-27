@@ -14,6 +14,7 @@ const factoryOrderRoutes = require('./routes/factoryOrders');
 const cashClosingRoutes = require('./routes/cashClosings');
 const gastosRoutes = require('./routes/gastos');
 const mermasRoutes = require('./routes/mermas');
+const loyaltyRoutes = require('./routes/loyalty');
 const wholesaleClientRoutes = require('./routes/wholesaleClients');
 const wholesaleOrderRoutes = require('./routes/wholesaleOrders');
 const wholesalePaymentRoutes = require('./routes/wholesalePayments');
@@ -94,6 +95,75 @@ async function runMigrations() {
         END IF;
       END $$
     `);
+    // ── Tablas de fidelización por puntos ──
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS loyalty_config (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        puntos_por_monto INTEGER NOT NULL DEFAULT 100,
+        monto_base NUMERIC NOT NULL DEFAULT 1000,
+        vencimiento_meses INTEGER NOT NULL DEFAULT 6,
+        activo BOOLEAN NOT NULL DEFAULT TRUE,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`INSERT INTO loyalty_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS loyalty_levels (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(30) NOT NULL,
+        puntos_minimos INTEGER NOT NULL DEFAULT 0,
+        orden INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+    await client.query(`
+      INSERT INTO loyalty_levels (nombre, puntos_minimos, orden) VALUES
+        ('Bronce', 0, 1),
+        ('Plata', 5000, 2),
+        ('Oro', 15000, 3)
+      ON CONFLICT DO NOTHING
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS loyalty_clients (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL DEFAULT 'Cliente',
+        whatsapp VARCHAR(30) UNIQUE,
+        email VARCHAR(100) UNIQUE,
+        puntos_vigentes INTEGER NOT NULL DEFAULT 0,
+        puntos_total_historico INTEGER NOT NULL DEFAULT 0,
+        nivel VARCHAR(30) NOT NULL DEFAULT 'Bronce',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS loyalty_beneficios (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL,
+        tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('descuento','producto','envio_gratis')),
+        puntos_necesarios INTEGER NOT NULL,
+        descripcion TEXT,
+        activo BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS loyalty_movimientos (
+        id SERIAL PRIMARY KEY,
+        client_id INTEGER NOT NULL REFERENCES loyalty_clients(id),
+        tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('acumulacion','canje','ajuste_manual','anulacion','vencimiento')),
+        puntos INTEGER NOT NULL,
+        sale_id INTEGER REFERENCES sales(id),
+        beneficio_id INTEGER REFERENCES loyalty_beneficios(id),
+        notas TEXT,
+        creado_por INTEGER REFERENCES users(id),
+        fecha_vencimiento DATE,
+        vencido BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
     // Tablas de merma de productos
     await client.query(`
       CREATE TABLE IF NOT EXISTS mermas (
@@ -167,6 +237,7 @@ app.use('/api/factory-orders', factoryOrderRoutes);
 app.use('/api/cash-closings', cashClosingRoutes);
 app.use('/api/gastos', gastosRoutes);
 app.use('/api/mermas', mermasRoutes);
+app.use('/api/loyalty', loyaltyRoutes);
 app.use('/api/wholesale-clients', wholesaleClientRoutes);
 app.use('/api/wholesale-orders', wholesaleOrderRoutes);
 app.use('/api/wholesale-payments', wholesalePaymentRoutes);

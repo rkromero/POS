@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const { awardPoints } = require('../services/loyaltyService');
 
 async function getAll(req, res, next) {
   try {
@@ -114,7 +115,12 @@ async function create(req, res, next) {
       `SELECT si.*, p.nombre as producto_nombre FROM sale_items si JOIN products p ON p.id=si.product_id WHERE si.sale_id=$1`,
       [sale.id]
     );
-    res.status(201).json({ ...fullSale.rows[0], items: saleItems.rows });
+    const saleData = { ...fullSale.rows[0], items: saleItems.rows };
+
+    // Otorgar puntos de fidelización (no bloquea la respuesta)
+    awardPoints(saleData);
+
+    res.status(201).json(saleData);
   } catch (err) {
     await client.query('ROLLBACK');
     next(err);

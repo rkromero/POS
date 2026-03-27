@@ -15,6 +15,7 @@ import LocalProducts from './pages/local/LocalProducts'
 import LocalReports from './pages/local/LocalReports'
 import PedidoFabrica from './pages/local/PedidoFabrica'
 import CierreCaja from './pages/local/CierreCaja'
+import Gastos from './pages/local/Gastos'
 import AdminFactoryOrders from './pages/admin/FactoryOrders'
 import WholesaleClients from './pages/admin/WholesaleClients'
 import WholesaleOrders from './pages/admin/WholesaleOrders'
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="productos" element={<LocalProducts />} />
           <Route path="reportes" element={<LocalReports />} />
           <Route path="cierre-caja" element={<CierreCaja />} />
+          <Route path="gastos" element={<Gastos />} />
           <Route path="pedido-fabrica" element={<PedidoFabrica />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />

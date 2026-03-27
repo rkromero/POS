@@ -12,6 +12,7 @@ const saleRoutes = require('./routes/sales');
 const reportRoutes = require('./routes/reports');
 const factoryOrderRoutes = require('./routes/factoryOrders');
 const cashClosingRoutes = require('./routes/cashClosings');
+const gastosRoutes = require('./routes/gastos');
 const wholesaleClientRoutes = require('./routes/wholesaleClients');
 const wholesaleOrderRoutes = require('./routes/wholesaleOrders');
 const wholesalePaymentRoutes = require('./routes/wholesalePayments');
@@ -92,6 +93,21 @@ async function runMigrations() {
         END IF;
       END $$
     `);
+    // Tabla de gastos del local
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gastos (
+        id SERIAL PRIMARY KEY,
+        local_id INTEGER NOT NULL REFERENCES locals(id),
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('Mercaderia','Sueldo','Vales','Servicios','Otros')),
+        descripcion TEXT,
+        monto NUMERIC(12,2) NOT NULL,
+        abonado_con VARCHAR(20) NOT NULL DEFAULT 'Efectivo Caja'
+          CHECK (abonado_con IN ('Efectivo Caja','Transferencia')),
+        fecha DATE NOT NULL DEFAULT CURRENT_DATE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
     console.log('✅ Tablas de mayoristas verificadas/creadas');
   } catch (err) {
     console.error('⚠️ Error en migración automática:', err.message);
@@ -128,6 +144,7 @@ app.use('/api/sales', saleRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/factory-orders', factoryOrderRoutes);
 app.use('/api/cash-closings', cashClosingRoutes);
+app.use('/api/gastos', gastosRoutes);
 app.use('/api/wholesale-clients', wholesaleClientRoutes);
 app.use('/api/wholesale-orders', wholesaleOrderRoutes);
 app.use('/api/wholesale-payments', wholesalePaymentRoutes);

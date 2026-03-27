@@ -5,6 +5,11 @@ import { useAuth } from '../../context/AuthContext'
 
 const fmt = (v) => `$${parseFloat(v || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
 
+// Parsea timestamps de PostgreSQL que pueden venir como "2026-03-27 15:30:00+00" o ISO
+const parseTS = (v) => v ? new Date(String(v).replace(' ', 'T').replace(/(\+\d{2})$/, '$1:00')) : new Date('invalid')
+// Parsea fechas DATE que pueden venir como "2026-03-27" o "2026-03-27T00:00:00Z"
+const parseFecha = (v) => v ? new Date(String(v).split('T')[0] + 'T12:00:00') : new Date('invalid')
+
 const METODOS = [
   { key: 'monto_efectivo', decKey: 'declarado_efectivo', inputKey: 'efectivo', label: 'Efectivo', icon: '💵' },
   { key: 'monto_debito', decKey: 'declarado_debito', inputKey: 'debito', label: 'Débito', icon: '💳' },
@@ -127,7 +132,7 @@ export default function CierreCaja() {
                   <div>
                     <p className="text-sm font-semibold text-green-700">Turno cerrado</p>
                     <p className="text-xs text-green-600">
-                      Cerrado a las {new Date(data.closing.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                      Cerrado a las {parseTS(data.closing.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </div>
@@ -213,7 +218,7 @@ export default function CierreCaja() {
                     </p>
                     {data.closings.map(c => (
                       <p key={c.id} className="text-xs text-green-600">
-                        {c.user_nombre} · {new Date(c.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} · declarado: {fmt(c.declarado_total)}
+                        {c.user_nombre} · {parseTS(c.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} · declarado: {fmt(c.declarado_total)}
                       </p>
                     ))}
                   </div>
@@ -267,7 +272,7 @@ export default function CierreCaja() {
                           <div>
                             <p className="text-xs font-semibold text-[#111111]">#{s.numero_comprobante} · {s.cliente_nombre}</p>
                             <p className="text-xs text-[#444444]">
-                              {new Date(s.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} · {s.metodo_pago} · {s.user_nombre}
+                              {parseTS(s.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} · {s.metodo_pago} · {s.user_nombre}
                             </p>
                           </div>
                           <span className="text-sm font-bold text-[#111111]">{fmt(s.total)}</span>
@@ -315,10 +320,10 @@ export default function CierreCaja() {
                       <tr key={c.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
                         <td className="py-3 px-4">
                           <p className="font-semibold text-[#111111] capitalize">
-                            {new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                            {parseFecha(c.fecha).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })}
                           </p>
                           <p className="text-xs text-[#444444]">
-                            {new Date(c.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                            {parseTS(c.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </td>
                         {isAdmin && <td className="py-3 px-4 text-[#111111]">{c.user_nombre}</td>}

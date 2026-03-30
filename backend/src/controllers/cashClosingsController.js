@@ -3,7 +3,7 @@ const pool = require('../db/pool');
 async function getDaySummary(req, res, next) {
   try {
     const fecha = req.query.fecha || new Date().toISOString().split('T')[0];
-    const isAdmin = req.user.role === 'administrador';
+    const isAdmin = req.user.role === 'admin';
     const local_id = isAdmin ? req.query.local_id : req.user.local_id;
     if (!local_id) return res.status(400).json({ error: 'local_id requerido' });
 
@@ -113,7 +113,7 @@ async function create(req, res, next) {
 
 async function getAll(req, res, next) {
   try {
-    const isAdmin = req.user.role === 'administrador';
+    const isAdmin = req.user.role === 'admin';
     const local_id = isAdmin ? req.query.local_id : req.user.local_id;
     const params = [];
     const conditions = [];

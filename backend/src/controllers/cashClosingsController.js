@@ -135,4 +135,87 @@ async function getAll(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { getDaySummary, create, getAll };
+async function getConsolidated(req, res, next) {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Acceso restringido a administradores' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const desde = req.query.desde || today;
+    const hasta = req.query.hasta || today;
+    const local_id = req.query.local_id || null;
+
+    const params = [desde, hasta];
+    const localFilter = local_id ? `AND cc.local_id = $${params.push(local_id)}` : '';
+
+    const consolidatedResult = await pool.query(
+      `SELECT
+        l.id as local_id,
+        l.nombre as local_nombre,
+        cc.fecha,
+        COUNT(DISTINCT cc.user_id) as num_cajeros,
+        COUNT(cc.id) as num_cierres,
+        COALESCE(SUM(cc.declarado_total), 0) as total_cajeros,
+        COALESCE((
+          SELECT SUM(s.total) FROM sales s
+          WHERE s.local_id = l.id
+            AND s.created_at >= cc.fecha::date
+            AND s.created_at < (cc.fecha::date + interval '1 day')
+        ), 0) as total_pos
+      FROM cash_closings cc
+      JOIN locals l ON l.id = cc.local_id
+      WHERE cc.fecha BETWEEN $1 AND $2
+        ${localFilter}
+      GROUP BY l.id, l.nombre, cc.fecha
+      ORDER BY cc.fecha DESC, l.nombre ASC`,
+      params
+    );
+
+    const rows = consolidatedResult.rows;
+    if (rows.length === 0) return res.json([]);
+
+    // Bulk fetch all individual closings for all (fecha, local_id) pairs — no N+1
+    const pairs = rows.map(r => `(${parseInt(r.local_id, 10)}, '${r.fecha}')`).join(', ');
+    const detailsResult = await pool.query(
+      `SELECT cc.id, cc.user_id, u.nombre as user_nombre,
+              cc.local_id, cc.fecha,
+              cc.declarado_total, cc.monto_total, cc.total_ventas,
+              cc.declarado_efectivo, cc.declarado_debito, cc.declarado_credito, cc.declarado_transferencia,
+              cc.notas, cc.created_at
+       FROM cash_closings cc
+       JOIN users u ON u.id = cc.user_id
+       WHERE (cc.local_id, cc.fecha) IN (${pairs})
+       ORDER BY cc.fecha DESC, cc.local_id ASC, cc.created_at ASC`
+    );
+
+    // Map details to their parent consolidated row
+    const detailMap = {};
+    for (const d of detailsResult.rows) {
+      const key = `${d.fecha}-${d.local_id}`;
+      if (!detailMap[key]) detailMap[key] = [];
+      detailMap[key].push(d);
+    }
+
+    const response = rows.map(r => {
+      const key = `${r.fecha}-${r.local_id}`;
+      const totalCajeros = parseFloat(r.total_cajeros) || 0;
+      const totalPos = parseFloat(r.total_pos) || 0;
+      return {
+        local_id: r.local_id,
+        local_nombre: r.local_nombre,
+        fecha: r.fecha,
+        num_cajeros: parseInt(r.num_cajeros, 10),
+        num_cierres: parseInt(r.num_cierres, 10),
+        total_cajeros: totalCajeros,
+        total_pos: totalPos,
+        diferencia: totalCajeros - totalPos,
+        cajeros: detailMap[key] || [],
+      };
+    });
+
+    res.json(response);
+  } catch (err) { next(err); }
+}
+
+module.exports = { getDaySummary, create, getAll, getConsolidated };

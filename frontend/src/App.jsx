@@ -22,6 +22,7 @@ import WholesaleClients from './pages/admin/WholesaleClients'
 import WholesaleOrders from './pages/admin/WholesaleOrders'
 import Fidelizacion from './pages/admin/Fidelizacion'
 import MisPuntos from './pages/MisPuntos'
+import AdminCierresCaja from './pages/admin/CierresCaja'
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="mayoristas" element={<WholesaleClients />} />
           <Route path="mayoristas/nuevo-pedido" element={<WholesaleOrders />} />
           <Route path="fidelizacion" element={<Fidelizacion />} />
+          <Route path="cierres-caja" element={<AdminCierresCaja />} />
         </Route>
         <Route path="/local" element={<PrivateRoute role="local"><LocalLayout /></PrivateRoute>}>
           <Route index element={<POS />} />

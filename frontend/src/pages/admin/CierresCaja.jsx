@@ -3,7 +3,10 @@ import api from '../../services/api'
 import toast from 'react-hot-toast'
 
 const fmt = (n) => Number(n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
-const today = () => new Date().toISOString().split('T')[0]
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
+// pg puede devolver DATE como string "YYYY-MM-DD" o como objeto Date; extraemos YYYY-MM-DD seguro
+const toYMD = (d) => (d ? String(d).slice(0, 10) : '')
+const fmtDate = (d) => { const s = toYMD(d); if (!s) return '—'; const [y, m, day] = s.split('-'); return `${day}/${m}/${y}` }
 
 export default function AdminCierresCaja() {
   const [tab, setTab] = useState('consolidado')
@@ -157,7 +160,7 @@ export default function AdminCierresCaja() {
                         <tr key={key} className="hover:bg-gray-50">
                           <td className="px-4 py-3 font-medium">{row.local_nombre}</td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            {new Date(row.fecha + 'T00:00:00').toLocaleDateString('es-AR')}
+                            {fmtDate(row.fecha)}
                           </td>
                           <td className="px-4 py-3 text-right">{row.num_cajeros}</td>
                           <td className="px-4 py-3 text-right">{row.num_cierres}</td>
@@ -266,7 +269,7 @@ export default function AdminCierresCaja() {
                     return (
                       <tr key={c.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {new Date(c.fecha + 'T00:00:00').toLocaleDateString('es-AR')}
+                          {fmtDate(c.fecha)}
                         </td>
                         <td className="px-4 py-3">{c.local_nombre}</td>
                         <td className="px-4 py-3 font-medium">{c.user_nombre}</td>

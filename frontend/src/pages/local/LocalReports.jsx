@@ -118,14 +118,14 @@ export default function LocalReports() {
               </tr>
             </thead>
             <tbody>
-              {topProducts.filter(p => p.unidad_medida === 'unidad' || !p.unidad_medida).map((p, i) => (
+              {topProducts.filter(p => p.unidad_medida !== 'kg').map((p, i) => (
                 <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
                   <td className="py-3 px-4 font-bold text-mimi-500">{i+1}</td>
                   <td className="py-3 px-4">{p.nombre}</td>
                   <td className="py-3 px-4 text-right">{p.total_cantidad}</td>
                 </tr>
               ))}
-              {topProducts.filter(p => p.unidad_medida === 'unidad' || !p.unidad_medida).length === 0 && (
+              {topProducts.filter(p => p.unidad_medida !== 'kg').length === 0 && (
                 <tr><td colSpan="3" className="text-center py-8 text-[#444444]">No hay datos disponibles</td></tr>
               )}
             </tbody>

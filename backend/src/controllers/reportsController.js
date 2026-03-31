@@ -39,7 +39,7 @@ async function salesByPeriod(req, res, next) {
 
 async function topProducts(req, res, next) {
   try {
-    const { local_id, limit = 10, desde, hasta } = req.query;
+    const { local_id, limit = 10, desde, hasta, unidad_medida } = req.query;
     const effectiveLocalId = req.user.role === 'local' ? req.user.local_id : local_id;
     const params = [];
     const conditions = [];
@@ -47,6 +47,8 @@ async function topProducts(req, res, next) {
     if (effectiveLocalId) { params.push(effectiveLocalId); conditions.push(`s.local_id = $${params.length}`); }
     if (desde) { params.push(desde); conditions.push(`s.created_at >= $${params.length}::date`); }
     if (hasta) { params.push(hasta); conditions.push(`s.created_at < ($${params.length}::date + interval '1 day')`); }
+    if (unidad_medida === 'kg') { conditions.push(`p.unidad_medida = 'kg'`); }
+    else if (unidad_medida === 'unidad') { conditions.push(`p.unidad_medida != 'kg'`); }
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
     params.push(limit);
 

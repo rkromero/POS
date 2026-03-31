@@ -6,7 +6,8 @@ import toast from 'react-hot-toast'
 
 export default function LocalReports() {
   const [byPeriod, setByPeriod] = useState([])
-  const [topProducts, setTopProducts] = useState([])
+  const [topKg, setTopKg] = useState([])
+  const [topUnidad, setTopUnidad] = useState([])
   const [period, setPeriod] = useState('day')
   const [desde, setDesde] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().split('T')[0]
@@ -16,12 +17,14 @@ export default function LocalReports() {
   useEffect(() => {
     async function load() {
       try {
-        const [r1, r2] = await Promise.all([
+        const [r1, r2, r3] = await Promise.all([
           api.get(`/reports/by-period?desde=${desde}&hasta=${hasta}&period=${period}`),
-          api.get(`/reports/top-products?limit=10&desde=${desde}&hasta=${hasta}`),
+          api.get(`/reports/top-products?limit=10&desde=${desde}&hasta=${hasta}&unidad_medida=kg`),
+          api.get(`/reports/top-products?limit=10&desde=${desde}&hasta=${hasta}&unidad_medida=unidad`),
         ])
         setByPeriod(r1.data)
-        setTopProducts(r2.data)
+        setTopKg(r2.data)
+        setTopUnidad(r3.data)
       } catch { toast.error('Error al cargar reportes') }
     }
     load()
@@ -90,14 +93,14 @@ export default function LocalReports() {
               </tr>
             </thead>
             <tbody>
-              {topProducts.filter(p => p.unidad_medida === 'kg').map((p, i) => (
+              {topKg.map((p, i) => (
                 <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
                   <td className="py-3 px-4 font-bold text-mimi-500">{i+1}</td>
                   <td className="py-3 px-4">{p.nombre}</td>
                   <td className="py-3 px-4 text-right">{p.total_cantidad}</td>
                 </tr>
               ))}
-              {topProducts.filter(p => p.unidad_medida === 'kg').length === 0 && (
+              {topKg.length === 0 && (
                 <tr><td colSpan="3" className="text-center py-8 text-[#444444]">No hay datos disponibles</td></tr>
               )}
             </tbody>
@@ -118,14 +121,14 @@ export default function LocalReports() {
               </tr>
             </thead>
             <tbody>
-              {topProducts.filter(p => p.unidad_medida !== 'kg').map((p, i) => (
+              {topUnidad.map((p, i) => (
                 <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
                   <td className="py-3 px-4 font-bold text-mimi-500">{i+1}</td>
                   <td className="py-3 px-4">{p.nombre}</td>
                   <td className="py-3 px-4 text-right">{p.total_cantidad}</td>
                 </tr>
               ))}
-              {topProducts.filter(p => p.unidad_medida !== 'kg').length === 0 && (
+              {topUnidad.length === 0 && (
                 <tr><td colSpan="3" className="text-center py-8 text-[#444444]">No hay datos disponibles</td></tr>
               )}
             </tbody>

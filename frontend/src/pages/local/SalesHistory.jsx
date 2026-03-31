@@ -33,8 +33,6 @@ export default function SalesHistory() {
     catch { toast.error('Error al cargar detalle') }
   }
 
-  const totalMonto = sales.reduce((s, v) => s + parseFloat(v.total || 0), 0)
-
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6 text-[#111111]">Historial de ventas</h1>
@@ -61,10 +59,6 @@ export default function SalesHistory() {
             <p className="text-xs text-[#444444]">Ventas en página</p>
             <p className="text-xl font-bold text-[#111111]">{sales.length}</p>
           </div>
-          <div className="card py-3 px-4 flex-1">
-            <p className="text-xs text-[#444444]">Monto en página</p>
-            <p className="text-xl font-bold text-mimi-500">{fmt(totalMonto)}</p>
-          </div>
         </div>
       )}
 
@@ -75,7 +69,6 @@ export default function SalesHistory() {
               <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">N°</th>
               <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">Cliente</th>
               <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">Pago</th>
-              <th className="text-right py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">Total</th>
               <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">Fecha</th>
               <th className="py-3 px-4"></th>
             </tr>
@@ -86,7 +79,6 @@ export default function SalesHistory() {
                 <td className="py-3 px-4 font-mono text-[#444444] text-xs">#{String(s.numero_comprobante).padStart(6, '0')}</td>
                 <td className="py-3 px-4 font-medium">{s.cliente_nombre}</td>
                 <td className="py-3 px-4 text-[#444444]">{PAYMENT_LABELS[s.metodo_pago]}</td>
-                <td className="py-3 px-4 text-right font-bold text-mimi-500">{fmt(s.total)}</td>
                 <td className="py-3 px-4 text-[#444444] text-xs">{fmtDate(s.created_at)}</td>
                 <td className="py-3 px-4 text-right">
                   <button onClick={() => openDetail(s.id)} className="text-mimi-500 hover:underline text-xs font-medium">
@@ -96,7 +88,7 @@ export default function SalesHistory() {
               </tr>
             ))}
             {sales.length === 0 && (
-              <tr><td colSpan="6" className="text-center py-12 text-[#444444]">No hay ventas registradas</td></tr>
+              <tr><td colSpan="5" className="text-center py-12 text-[#444444]">No hay ventas registradas</td></tr>
             )}
           </tbody>
         </table>

@@ -51,12 +51,12 @@ async function topProducts(req, res, next) {
     params.push(limit);
 
     const result = await pool.query(
-      `SELECT p.id, p.nombre, SUM(si.cantidad) as total_cantidad, SUM(si.subtotal) as total_monto
+      `SELECT p.id, p.nombre, p.unidad_medida, SUM(si.cantidad) as total_cantidad, SUM(si.subtotal) as total_monto
        FROM sale_items si
        JOIN products p ON p.id = si.product_id
        JOIN sales s ON s.id = si.sale_id
        ${where}
-       GROUP BY p.id, p.nombre
+       GROUP BY p.id, p.nombre, p.unidad_medida
        ORDER BY total_cantidad DESC
        LIMIT $${params.length}`,
       params

@@ -75,29 +75,62 @@ export default function LocalReports() {
         </ResponsiveContainer>
       </div>
 
-      <div className="card p-0 overflow-hidden">
-        <div className="px-6 py-4 border-b border-[#E5E7EB]">
-          <h2 className="text-base font-semibold text-[#111111]">Mis productos más vendidos</h2>
-        </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-mimi-50">
-              <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">#</th>
-              <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">Producto</th>
-              <th className="text-right py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">Cant.</th>
-            </tr>
-          </thead>
-          <tbody>
-            {topProducts.map((p, i) => (
-              <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                <td className="py-3 px-4 font-bold text-mimi-500">{i+1}</td>
-                <td className="py-3 px-4">{p.nombre}</td>
-                <td className="py-3 px-4 text-right">{p.total_cantidad}</td>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="card p-0 overflow-hidden">
+          <div className="px-6 py-4 border-b border-[#E5E7EB]">
+            <h2 className="text-base font-semibold text-[#111111]">Mis productos más vendidos</h2>
+            <p className="text-xs text-[#444444] mt-0.5">Por Kilogramo</p>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-mimi-50">
+                <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">#</th>
+                <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">Producto</th>
+                <th className="text-right py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">Cant.</th>
               </tr>
-            ))}
-            {topProducts.length === 0 && <tr><td colSpan="4" className="text-center py-8 text-[#444444]">No hay datos disponibles</td></tr>}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {topProducts.filter(p => p.unidad_medida === 'kg').map((p, i) => (
+                <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                  <td className="py-3 px-4 font-bold text-mimi-500">{i+1}</td>
+                  <td className="py-3 px-4">{p.nombre}</td>
+                  <td className="py-3 px-4 text-right">{p.total_cantidad}</td>
+                </tr>
+              ))}
+              {topProducts.filter(p => p.unidad_medida === 'kg').length === 0 && (
+                <tr><td colSpan="3" className="text-center py-8 text-[#444444]">No hay datos disponibles</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="card p-0 overflow-hidden">
+          <div className="px-6 py-4 border-b border-[#E5E7EB]">
+            <h2 className="text-base font-semibold text-[#111111]">Mis productos más vendidos</h2>
+            <p className="text-xs text-[#444444] mt-0.5">Por Unidad</p>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-mimi-50">
+                <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">#</th>
+                <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">Producto</th>
+                <th className="text-right py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">Cant.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topProducts.filter(p => p.unidad_medida === 'unidad' || !p.unidad_medida).map((p, i) => (
+                <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                  <td className="py-3 px-4 font-bold text-mimi-500">{i+1}</td>
+                  <td className="py-3 px-4">{p.nombre}</td>
+                  <td className="py-3 px-4 text-right">{p.total_cantidad}</td>
+                </tr>
+              ))}
+              {topProducts.filter(p => p.unidad_medida === 'unidad' || !p.unidad_medida).length === 0 && (
+                <tr><td colSpan="3" className="text-center py-8 text-[#444444]">No hay datos disponibles</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

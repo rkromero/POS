@@ -41,10 +41,13 @@ async function login(req, res, next) {
 
     const { accessToken, refreshToken } = generateTokens(payload);
 
+    const isProd = process.env.NODE_ENV === 'production';
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: isProd,
+      // En prod (Railway) frontend y backend son subdominios distintos → cross-site
+      // SameSite=None requiere Secure=true y permite envío cross-site con withCredentials
+      sameSite: isProd ? 'none' : 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -74,10 +77,11 @@ async function refresh(req, res, next) {
 
     const { accessToken, refreshToken: newRefresh } = generateTokens(newPayload);
 
+    const isProdRefresh = process.env.NODE_ENV === 'production';
     res.cookie('refreshToken', newRefresh, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: isProdRefresh,
+      sameSite: isProdRefresh ? 'none' : 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 

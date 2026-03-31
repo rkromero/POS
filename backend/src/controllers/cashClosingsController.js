@@ -175,8 +175,10 @@ async function getConsolidated(req, res, next) {
     const rows = consolidatedResult.rows;
     if (rows.length === 0) return res.json([]);
 
-    // Bulk fetch all individual closings for all (fecha, local_id) pairs — no N+1
-    const pairs = rows.map(r => `(${parseInt(r.local_id, 10)}, '${r.fecha}')`).join(', ');
+    // Helper: normaliza fecha sin importar si pg la devuelve como string o Date
+    const toDateStr = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10));
+
+    // Bulk fetch con los mismos filtros — evita construcción de pares con fechas
     const detailsResult = await pool.query(
       `SELECT cc.id, cc.user_id, u.nombre as user_nombre,
               cc.local_id, cc.fecha,
@@ -185,20 +187,22 @@ async function getConsolidated(req, res, next) {
               cc.notas, cc.created_at
        FROM cash_closings cc
        JOIN users u ON u.id = cc.user_id
-       WHERE (cc.local_id, cc.fecha) IN (${pairs})
-       ORDER BY cc.fecha DESC, cc.local_id ASC, cc.created_at ASC`
+       WHERE cc.fecha BETWEEN $1 AND $2
+         ${localFilter}
+       ORDER BY cc.fecha DESC, cc.local_id ASC, cc.created_at ASC`,
+      params
     );
 
     // Map details to their parent consolidated row
     const detailMap = {};
     for (const d of detailsResult.rows) {
-      const key = `${d.fecha}-${d.local_id}`;
+      const key = `${toDateStr(d.fecha)}-${d.local_id}`;
       if (!detailMap[key]) detailMap[key] = [];
       detailMap[key].push(d);
     }
 
     const response = rows.map(r => {
-      const key = `${r.fecha}-${r.local_id}`;
+      const key = `${toDateStr(r.fecha)}-${r.local_id}`;
       const totalCajeros = parseFloat(r.total_cajeros) || 0;
       const totalPos = parseFloat(r.total_pos) || 0;
       return {

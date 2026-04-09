@@ -95,6 +95,45 @@ async function byCashier(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function gastosKpi(req, res, next) {
+  try {
+    const { desde, hasta, local_id } = req.query;
+    const params = [];
+    const conditions = [];
+
+    if (local_id) { params.push(local_id); conditions.push(`local_id = $${params.length}`); }
+    if (desde) { params.push(desde); conditions.push(`fecha >= $${params.length}::date`); }
+    if (hasta) { params.push(hasta); conditions.push(`fecha <= $${params.length}::date`); }
+
+    const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+
+    const result = await pool.query(
+      `SELECT tipo, COALESCE(SUM(monto), 0) AS total
+       FROM gastos ${where}
+       GROUP BY tipo`,
+      params
+    );
+
+    const byTipo = {};
+    result.rows.forEach(r => { byTipo[r.tipo] = parseFloat(r.total); });
+
+    // Total ventas para el mismo período y local
+    const vParams = [];
+    const vCond = [];
+    if (local_id) { vParams.push(local_id); vCond.push(`local_id = $${vParams.length}`); }
+    if (desde) { vParams.push(desde); vCond.push(`created_at >= $${vParams.length}::date`); }
+    if (hasta) { vParams.push(hasta); vCond.push(`created_at < ($${vParams.length}::date + interval '1 day')`); }
+    const vWhere = vCond.length ? 'WHERE ' + vCond.join(' AND ') : '';
+    const vResult = await pool.query(`SELECT COALESCE(SUM(total), 0) AS total_ventas FROM sales ${vWhere}`, vParams);
+    const totalVentas = parseFloat(vResult.rows[0].total_ventas);
+
+    const mercaderia = byTipo['Mercaderia'] || 0;
+    const pctMercaderia = totalVentas > 0 ? (mercaderia / totalVentas) * 100 : null;
+
+    res.json({ byTipo, totalVentas, mercaderia, pctMercaderia });
+  } catch (err) { next(err); }
+}
+
 async function dailyResult(req, res, next) {
   try {
     const { desde, hasta, local_id } = req.query;
@@ -170,4 +209,4 @@ async function comparisonByLocal(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { salesByLocal, salesByPeriod, topProducts, byCashier, dailyResult, comparisonByLocal };
+module.exports = { salesByLocal, salesByPeriod, topProducts, byCashier, gastosKpi, dailyResult, comparisonByLocal };

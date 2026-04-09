@@ -36,6 +36,7 @@ export default function AdminDashboard() {
   const [topProducts, setTopProducts] = useState([])
   const [byCashier, setByCashier] = useState([])
   const [dailyResult, setDailyResult] = useState([])
+  const [gastosKpi, setGastosKpi] = useState(null)
   const [users, setUsers] = useState([])
   const [period, setPeriod] = useState('day')
   const [localId, setLocalId] = useState('')
@@ -58,13 +59,14 @@ export default function AdminDashboard() {
         const resultParams = new URLSearchParams({ desde, hasta })
         if (localId) resultParams.set('local_id', localId)
 
-        const [r1, r2, r3, r4, r5, r6] = await Promise.all([
+        const [r1, r2, r3, r4, r5, r6, r7] = await Promise.all([
           api.get('/reports/by-local'),
           api.get(`/reports/by-period?${periodParams}`),
           api.get(`/reports/top-products?limit=10&desde=${desde}&hasta=${hasta}`),
           api.get(`/reports/by-cashier?${cashierParams}`),
           api.get('/users?limit=100'),
           api.get(`/reports/daily-result?${resultParams}`),
+          api.get(`/reports/gastos-kpi?${resultParams}`),
         ])
         setByLocal(r1.data)
         setByPeriod(r2.data)
@@ -72,6 +74,7 @@ export default function AdminDashboard() {
         setByCashier(r4.data)
         setUsers(r5.data.data || [])
         setDailyResult(r6.data)
+        setGastosKpi(r7.data)
       } catch { toast.error('Error al cargar reportes') }
     }
     load()
@@ -159,6 +162,33 @@ export default function AdminDashboard() {
             <Bar dataKey="monto" fill="#E91E8C" radius={[4,4,0,0]} name="Monto" />
           </BarChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="card">
+          <p className="text-sm text-[#444444] font-medium">Mercadería / Ventas</p>
+          {gastosKpi?.pctMercaderia != null ? (
+            <>
+              <p className="text-3xl font-bold mt-1 text-[#111111]">
+                {gastosKpi.pctMercaderia.toFixed(1)}%
+              </p>
+              <p className="text-xs text-[#444444] mt-1">
+                {fmt(gastosKpi.mercaderia)} sobre {fmt(gastosKpi.totalVentas)}
+              </p>
+            </>
+          ) : (
+            <p className="text-3xl font-bold mt-1 text-[#444444]">—</p>
+          )}
+        </div>
+        <div className="card">
+          <p className="text-sm text-[#444444] font-medium">&nbsp;</p>
+          <p className="text-3xl font-bold mt-1 text-[#444444]">—</p>
+        </div>
+        <div className="card">
+          <p className="text-sm text-[#444444] font-medium">&nbsp;</p>
+          <p className="text-3xl font-bold mt-1 text-[#444444]">—</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

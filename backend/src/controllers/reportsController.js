@@ -95,6 +95,62 @@ async function byCashier(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function dailyResult(req, res, next) {
+  try {
+    const { desde, hasta, local_id } = req.query;
+    const start = desde || new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+    const end = hasta || new Date().toISOString().split('T')[0];
+    const params = [start, end];
+
+    const salesCond = local_id ? (params.push(local_id), `AND local_id = $${params.length}`) : '';
+    const gastosCond = local_id ? `AND local_id = $${params.length}` : '';
+    const mermaCond = local_id ? `AND m.local_id = $${params.length}` : '';
+
+    const result = await pool.query(`
+      WITH dias AS (
+        SELECT generate_series($1::date, $2::date, '1 day'::interval)::date AS dia
+      ),
+      ventas AS (
+        SELECT created_at::date AS dia, COALESCE(SUM(total), 0) AS total_ventas
+        FROM sales
+        WHERE created_at >= $1::date AND created_at < ($2::date + interval '1 day')
+        ${salesCond}
+        GROUP BY created_at::date
+      ),
+      gastos_agg AS (
+        SELECT fecha AS dia, COALESCE(SUM(monto), 0) AS total_gastos
+        FROM gastos
+        WHERE fecha >= $1::date AND fecha <= $2::date
+        ${gastosCond}
+        GROUP BY fecha
+      ),
+      merma_agg AS (
+        SELECT m.created_at::date AS dia,
+               COALESCE(SUM(mi.cantidad * p.precio), 0) AS total_merma
+        FROM mermas m
+        JOIN merma_items mi ON mi.merma_id = m.id
+        JOIN products p ON p.id = mi.product_id
+        WHERE m.created_at >= $1::date AND m.created_at < ($2::date + interval '1 day')
+        ${mermaCond}
+        GROUP BY m.created_at::date
+      )
+      SELECT
+        d.dia,
+        COALESCE(v.total_ventas, 0)  AS total_ventas,
+        COALESCE(g.total_gastos, 0)  AS total_gastos,
+        COALESCE(me.total_merma, 0)  AS total_merma,
+        COALESCE(v.total_ventas, 0) - COALESCE(g.total_gastos, 0) - COALESCE(me.total_merma, 0) AS resultado
+      FROM dias d
+      LEFT JOIN ventas      v  ON v.dia  = d.dia
+      LEFT JOIN gastos_agg  g  ON g.dia  = d.dia
+      LEFT JOIN merma_agg   me ON me.dia = d.dia
+      ORDER BY d.dia ASC
+    `, params);
+
+    res.json(result.rows);
+  } catch (err) { next(err); }
+}
+
 async function comparisonByLocal(req, res, next) {
   try {
     const { desde, hasta } = req.query;
@@ -114,4 +170,4 @@ async function comparisonByLocal(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { salesByLocal, salesByPeriod, topProducts, byCashier, comparisonByLocal };
+module.exports = { salesByLocal, salesByPeriod, topProducts, byCashier, dailyResult, comparisonByLocal };

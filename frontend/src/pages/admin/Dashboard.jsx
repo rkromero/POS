@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
@@ -14,11 +14,28 @@ function StatCard({ title, value, accent }) {
   )
 }
 
+function ResultTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const d = payload[0]?.payload
+  return (
+    <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-md p-3 text-sm">
+      <p className="font-semibold text-[#111111] mb-2">{label}</p>
+      <p className="text-green-600">Ventas: {fmt(d?.total_ventas)}</p>
+      <p className="text-red-500">Gastos: {fmt(d?.total_gastos)}</p>
+      <p className="text-orange-500">Merma: {fmt(d?.total_merma)}</p>
+      <p className={`font-bold mt-1 border-t border-[#E5E7EB] pt-1 ${parseFloat(d?.resultado) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        Resultado: {fmt(d?.resultado)}
+      </p>
+    </div>
+  )
+}
+
 export default function AdminDashboard() {
   const [byLocal, setByLocal] = useState([])
   const [byPeriod, setByPeriod] = useState([])
   const [topProducts, setTopProducts] = useState([])
   const [byCashier, setByCashier] = useState([])
+  const [dailyResult, setDailyResult] = useState([])
   const [users, setUsers] = useState([])
   const [period, setPeriod] = useState('day')
   const [localId, setLocalId] = useState('')
@@ -38,18 +55,23 @@ export default function AdminDashboard() {
         if (localId) cashierParams.set('local_id', localId)
         if (cajeroId) cashierParams.set('user_id', cajeroId)
 
-        const [r1, r2, r3, r4, r5] = await Promise.all([
+        const resultParams = new URLSearchParams({ desde, hasta })
+        if (localId) resultParams.set('local_id', localId)
+
+        const [r1, r2, r3, r4, r5, r6] = await Promise.all([
           api.get('/reports/by-local'),
           api.get(`/reports/by-period?${periodParams}`),
           api.get(`/reports/top-products?limit=10&desde=${desde}&hasta=${hasta}`),
           api.get(`/reports/by-cashier?${cashierParams}`),
           api.get('/users?limit=100'),
+          api.get(`/reports/daily-result?${resultParams}`),
         ])
         setByLocal(r1.data)
         setByPeriod(r2.data)
         setTopProducts(r3.data)
         setByCashier(r4.data)
         setUsers(r5.data.data || [])
+        setDailyResult(r6.data)
       } catch { toast.error('Error al cargar reportes') }
     }
     load()
@@ -66,6 +88,23 @@ export default function AdminDashboard() {
       ventas: parseInt(row.total_ventas || 0),
     }
   })
+
+  const resultData = dailyResult
+    .filter(row =>
+      parseFloat(row.total_ventas) > 0 ||
+      parseFloat(row.total_gastos) > 0 ||
+      parseFloat(row.total_merma) > 0
+    )
+    .map(row => {
+      const [, m, d] = row.dia.substring(0, 10).split('-')
+      return {
+        name: `${d}/${m}`,
+        resultado: parseFloat(row.resultado),
+        total_ventas: parseFloat(row.total_ventas),
+        total_gastos: parseFloat(row.total_gastos),
+        total_merma: parseFloat(row.total_merma),
+      }
+    })
 
   return (
     <div className="space-y-6">
@@ -106,7 +145,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Gráfico */}
+      {/* Gráfico ventas por período */}
       <div className="card">
         <h2 className="text-base font-semibold text-[#111111] mb-4">
           Ventas por período{localId ? ` — ${byLocal.find(l => String(l.id) === String(localId))?.nombre}` : ''}
@@ -217,6 +256,38 @@ export default function AdminDashboard() {
             {byCashier.length === 0 && <tr><td colSpan="4" className="text-center py-6 text-[#444444]">Sin datos</td></tr>}
           </tbody>
         </table>
+      </div>
+
+      {/* Resultado diario */}
+      <div className="card">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 className="text-base font-semibold text-[#111111]">Resultado diario</h2>
+            <p className="text-xs text-[#444444] mt-0.5">Ventas − Gastos − Merma</p>
+          </div>
+          <div className="flex gap-4 text-xs text-[#444444]">
+            <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-green-500"></span>Positivo</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-red-500"></span>Negativo</span>
+          </div>
+        </div>
+        {resultData.length === 0 ? (
+          <p className="text-center text-[#444444] py-10 text-sm">Sin datos en el período seleccionado</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={resultData} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#444444' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#444444' }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+              <ReferenceLine y={0} stroke="#999" strokeDasharray="4 2" />
+              <Tooltip content={<ResultTooltip />} />
+              <Bar dataKey="resultado" radius={[4,4,0,0]} name="Resultado">
+                {resultData.map((entry, i) => (
+                  <Cell key={i} fill={entry.resultado >= 0 ? '#22c55e' : '#ef4444'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   )

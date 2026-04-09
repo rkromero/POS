@@ -67,6 +67,34 @@ async function topProducts(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function byCashier(req, res, next) {
+  try {
+    const { desde, hasta, local_id, user_id } = req.query;
+    const params = [];
+    const conditions = [];
+
+    if (local_id) { params.push(local_id); conditions.push(`s.local_id = $${params.length}`); }
+    if (user_id) { params.push(user_id); conditions.push(`s.user_id = $${params.length}`); }
+    if (desde) { params.push(desde); conditions.push(`s.created_at >= $${params.length}::date`); }
+    if (hasta) { params.push(hasta); conditions.push(`s.created_at < ($${params.length}::date + interval '1 day')`); }
+
+    const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+
+    const result = await pool.query(
+      `SELECT u.id, u.nombre, l.nombre as local_nombre,
+              COUNT(s.id) as total_ventas, COALESCE(SUM(s.total),0) as monto_total
+       FROM sales s
+       JOIN users u ON u.id = s.user_id
+       JOIN locals l ON l.id = s.local_id
+       ${where}
+       GROUP BY u.id, u.nombre, l.nombre
+       ORDER BY monto_total DESC`,
+      params
+    );
+    res.json(result.rows);
+  } catch (err) { next(err); }
+}
+
 async function comparisonByLocal(req, res, next) {
   try {
     const { desde, hasta } = req.query;
@@ -86,4 +114,4 @@ async function comparisonByLocal(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { salesByLocal, salesByPeriod, topProducts, comparisonByLocal };
+module.exports = { salesByLocal, salesByPeriod, topProducts, byCashier, comparisonByLocal };

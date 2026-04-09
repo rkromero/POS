@@ -43,11 +43,14 @@ export default function AdminDashboard() {
   const totalMonto = byLocal.reduce((s, l) => s + parseFloat(l.monto_total || 0), 0)
   const totalVentas = byLocal.reduce((s, l) => s + parseInt(l.total_ventas || 0), 0)
 
-  const periodData = byPeriod.map(row => ({
-    name: new Date(row.periodo).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }),
-    monto: parseFloat(row.monto_total || 0),
-    ventas: parseInt(row.total_ventas || 0),
-  }))
+  const periodData = byPeriod.map(row => {
+    const [, m, d] = row.periodo.substring(0, 10).split('-')
+    return {
+      name: `${d}/${m}`,
+      monto: parseFloat(row.monto_total || 0),
+      ventas: parseInt(row.total_ventas || 0),
+    }
+  })
 
   return (
     <div className="space-y-6">

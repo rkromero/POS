@@ -95,6 +95,30 @@ async function byCashier(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function gastosByPeriod(req, res, next) {
+  try {
+    const { desde, hasta, local_id, period = 'day' } = req.query;
+    const params = [];
+    const conditions = [];
+
+    if (local_id) { params.push(local_id); conditions.push(`local_id = $${params.length}`); }
+    if (desde) { params.push(desde); conditions.push(`fecha >= $${params.length}::date`); }
+    if (hasta) { params.push(hasta); conditions.push(`fecha <= $${params.length}::date`); }
+
+    const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+    const trunc = ['day', 'week', 'month'].includes(period) ? period : 'day';
+
+    const result = await pool.query(
+      `SELECT DATE_TRUNC('${trunc}', fecha) AS periodo, tipo, COALESCE(SUM(monto), 0) AS total
+       FROM gastos ${where}
+       GROUP BY DATE_TRUNC('${trunc}', fecha), tipo
+       ORDER BY periodo ASC`,
+      params
+    );
+    res.json(result.rows);
+  } catch (err) { next(err); }
+}
+
 async function gastosKpi(req, res, next) {
   try {
     const { desde, hasta, local_id } = req.query;
@@ -209,4 +233,4 @@ async function comparisonByLocal(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { salesByLocal, salesByPeriod, topProducts, byCashier, gastosKpi, dailyResult, comparisonByLocal };
+module.exports = { salesByLocal, salesByPeriod, topProducts, byCashier, gastosByPeriod, gastosKpi, dailyResult, comparisonByLocal };

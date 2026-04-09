@@ -35,6 +35,7 @@ export default function AdminDashboard() {
   const [byPeriod, setByPeriod] = useState([])
   const [topProducts, setTopProducts] = useState([])
   const [byCashier, setByCashier] = useState([])
+  const [gastosByPeriod, setGastosByPeriod] = useState([])
   const [dailyResult, setDailyResult] = useState([])
   const [gastosKpi, setGastosKpi] = useState(null)
   const [users, setUsers] = useState([])
@@ -59,7 +60,7 @@ export default function AdminDashboard() {
         const resultParams = new URLSearchParams({ desde, hasta })
         if (localId) resultParams.set('local_id', localId)
 
-        const [r1, r2, r3, r4, r5, r6, r7] = await Promise.all([
+        const [r1, r2, r3, r4, r5, r6, r7, r8] = await Promise.all([
           api.get('/reports/by-local'),
           api.get(`/reports/by-period?${periodParams}`),
           api.get(`/reports/top-products?limit=10&desde=${desde}&hasta=${hasta}`),
@@ -67,6 +68,7 @@ export default function AdminDashboard() {
           api.get('/users?limit=100'),
           api.get(`/reports/daily-result?${resultParams}`),
           api.get(`/reports/gastos-kpi?${resultParams}`),
+          api.get(`/reports/gastos-by-period?${periodParams}`),
         ])
         setByLocal(r1.data)
         setByPeriod(r2.data)
@@ -75,6 +77,7 @@ export default function AdminDashboard() {
         setUsers(r5.data.data || [])
         setDailyResult(r6.data)
         setGastosKpi(r7.data)
+        setGastosByPeriod(r8.data)
       } catch { toast.error('Error al cargar reportes') }
     }
     load()
@@ -91,6 +94,31 @@ export default function AdminDashboard() {
       ventas: parseInt(row.total_ventas || 0),
     }
   })
+
+  const TIPOS = ['Mercaderia', 'Sueldo', 'Vales', 'Servicios', 'Otros']
+  const TIPO_COLOR = {
+    Mercaderia: '#3b82f6',
+    Sueldo:     '#8b5cf6',
+    Vales:      '#f97316',
+    Servicios:  '#14b8a6',
+    Otros:      '#6b7280',
+  }
+
+  // Pivot: [{periodo, tipo, total}] → [{name, Mercaderia, Sueldo, ...}]
+  const gastosData = (() => {
+    const map = {}
+    gastosByPeriod.forEach(row => {
+      const key = row.periodo.substring(0, 10)
+      if (!map[key]) map[key] = { key }
+      map[key][row.tipo] = parseFloat(row.total)
+    })
+    return Object.values(map)
+      .sort((a, b) => a.key.localeCompare(b.key))
+      .map(row => {
+        const [, m, d] = row.key.split('-')
+        return { name: `${d}/${m}`, ...row }
+      })
+  })()
 
   const resultData = dailyResult
     .filter(row =>
@@ -162,6 +190,34 @@ export default function AdminDashboard() {
             <Bar dataKey="monto" fill="#E91E8C" radius={[4,4,0,0]} name="Monto" />
           </BarChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* Gráfico gastos por período */}
+      <div className="card">
+        <h2 className="text-base font-semibold text-[#111111] mb-1">Gastos por período</h2>
+        <div className="flex flex-wrap gap-3 mb-4">
+          {TIPOS.map(t => (
+            <span key={t} className="flex items-center gap-1.5 text-xs text-[#444444]">
+              <span className="inline-block w-3 h-3 rounded" style={{ background: TIPO_COLOR[t] }}></span>
+              {t}
+            </span>
+          ))}
+        </div>
+        {gastosData.length === 0 ? (
+          <p className="text-center text-[#444444] py-10 text-sm">Sin gastos en el período seleccionado</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={gastosData} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#444444' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#444444' }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+              <Tooltip formatter={(v, name) => [fmt(v), name]} labelStyle={{ color: '#111111' }} />
+              {TIPOS.map(t => (
+                <Bar key={t} dataKey={t} stackId="gastos" fill={TIPO_COLOR[t]} name={t} />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       {/* KPI cards */}

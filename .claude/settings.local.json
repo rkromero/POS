@@ -8,7 +8,9 @@
       "Skill(update-config)",
       "Bash(find /c/Users/RODO/PanaderiaPOS/backend/src -type f -name *.js)",
       "Bash(find /c/Users/RODO/PanaderiaPOS/frontend/src -type f -name *.jsx -o -name *.js -o -name *.tsx -o -name *.ts)",
-      "Bash(grep -r \"tipo_cliente\\\\|categoria.*cliente\\\\|customer.*type\" /c/Users/RODO/PanaderiaPOS/backend --include=*.js --include=*.sql)"
+      "Bash(grep -r \"tipo_cliente\\\\|categoria.*cliente\\\\|customer.*type\" /c/Users/RODO/PanaderiaPOS/backend --include=*.js --include=*.sql)",
+      "Bash(git rm:*)",
+      "Bash(wc:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

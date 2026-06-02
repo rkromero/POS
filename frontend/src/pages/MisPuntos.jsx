@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 const TIPO_ICON = {
   descuento: '🏷️',
@@ -37,8 +37,8 @@ export default function MisPuntos() {
     setBeneficios([]);
     try {
       const [clienteRes, beneficiosRes] = await Promise.all([
-        axios.get(`/api/public/loyalty/cliente?q=${encodeURIComponent(query.trim())}`),
-        axios.get('/api/public/loyalty/beneficios'),
+        api.get(`/public/loyalty/cliente?q=${encodeURIComponent(query.trim())}`),
+        api.get('/public/loyalty/beneficios'),
       ]);
       setCliente(clienteRes.data);
       setBeneficios(beneficiosRes.data);
@@ -57,7 +57,7 @@ export default function MisPuntos() {
     if (!modal) return;
     setCanjeLoading(true);
     try {
-      const res = await axios.post('/api/public/loyalty/canje', {
+      const res = await api.post('/public/loyalty/canje', {
         client_id: cliente.id,
         beneficio_id: modal.beneficio.id,
       });

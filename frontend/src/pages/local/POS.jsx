@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import Ticket from '../../components/Ticket'
@@ -12,19 +12,66 @@ const PAYMENT_METHODS = [
 
 const fmt = (v) => `$${parseFloat(v).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
 
+const STORAGE_KEY = 'pos_carts'
+
+const newId = () =>
+  (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `c${Date.now()}${Math.floor(Math.random() * 1e6)}`
+
+const makeCart = (nombre) => ({ id: newId(), nombre, items: [], metodoPago: 'efectivo' })
+
+// Devuelve el primer nombre "Cliente N" libre, rellenando huecos
+const nextClienteName = (existing) => {
+  const names = new Set(existing.map(c => c.nombre))
+  let n = 1
+  while (names.has(`Cliente ${n}`)) n++
+  return `Cliente ${n}`
+}
+
+const loadInitial = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
+    if (saved && Array.isArray(saved.carts) && saved.carts.length) {
+      const carts = saved.carts.map(c => ({
+        id: c.id || newId(),
+        nombre: c.nombre || 'Cliente',
+        items: Array.isArray(c.items) ? c.items : [],
+        metodoPago: c.metodoPago || 'efectivo',
+      }))
+      const activeCartId = carts.find(c => c.id === saved.activeCartId)?.id || carts[0].id
+      return { carts, activeCartId }
+    }
+  } catch { /* noop */ }
+  const first = makeCart('Cliente 1')
+  return { carts: [first], activeCartId: first.id }
+}
+
 export default function POS() {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('')
-  const [cart, setCart] = useState([])
-  const [metodoPago, setMetodoPago] = useState('efectivo')
+
+  // ── Múltiples carritos ──────────────────────────────────────────────
+  const initialRef = useRef(null)
+  if (!initialRef.current) initialRef.current = loadInitial()
+  const [carts, setCarts] = useState(initialRef.current.carts)
+  const [activeCartId, setActiveCartId] = useState(initialRef.current.activeCartId)
+  const [editingCartId, setEditingCartId] = useState(null)
+  const [editingName, setEditingName] = useState('')
+
   const [loading, setLoading] = useState(false)
   const [ticket, setTicket] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [clienteForm, setClienteForm] = useState({ nombre: '', email: '', whatsapp: '' })
   const [weightPopup, setWeightPopup] = useState(null)
   const [gramosInput, setGramosInput] = useState('')
+
+  // Carrito activo (siempre existe al menos uno)
+  const activeCart = carts.find(c => c.id === activeCartId) || carts[0]
+  const cart = activeCart.items
+  const metodoPago = activeCart.metodoPago
 
   useEffect(() => {
     async function load() {
@@ -40,12 +87,73 @@ export default function POS() {
     load()
   }, [])
 
+  // Persistir carritos en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ carts, activeCartId: activeCart.id }))
+    } catch { /* noop */ }
+  }, [carts, activeCartId, activeCart.id])
+
+  // Asegurar que el carrito activo siempre apunte a uno existente
+  useEffect(() => {
+    if (!carts.some(c => c.id === activeCartId)) setActiveCartId(carts[0].id)
+  }, [carts, activeCartId])
+
   const filtered = products.filter(p => {
     const matchSearch = !search || p.nombre.toLowerCase().includes(search.toLowerCase())
     const matchCat = !catFilter || String(p.categoria_id) === String(catFilter)
     return matchSearch && matchCat
   })
 
+  // ── Operaciones sobre el carrito activo ─────────────────────────────
+  const updateActiveItems = (updater) => {
+    setCarts(prev => prev.map(c =>
+      c.id === activeCart.id
+        ? { ...c, items: typeof updater === 'function' ? updater(c.items) : updater }
+        : c
+    ))
+  }
+
+  const setMetodoPago = (value) => {
+    setCarts(prev => prev.map(c => c.id === activeCart.id ? { ...c, metodoPago: value } : c))
+  }
+
+  // ── Gestión de carritos (pestañas) ──────────────────────────────────
+  const addCart = () => {
+    const c = makeCart(nextClienteName(carts))
+    setCarts(prev => [...prev, c])
+    setActiveCartId(c.id)
+  }
+
+  const removeCart = (id) => {
+    const c = carts.find(x => x.id === id)
+    if (c && c.items.length > 0 && !window.confirm(`¿Cerrar "${c.nombre}"? Se perderán sus productos.`)) return
+    // Si cerramos el carrito activo, cambiamos antes a otro para evitar parpadeos
+    if (id === activeCart.id) {
+      const remaining = carts.filter(x => x.id !== id)
+      if (remaining.length) setActiveCartId(remaining[0].id)
+    }
+    // Eliminación con updater funcional: robusta ante carritos agregados durante una venta en curso
+    setCarts(prev => {
+      const remaining = prev.filter(x => x.id !== id)
+      return remaining.length ? remaining : [makeCart('Cliente 1')]
+    })
+  }
+
+  const renameCart = (id, nombre) => setCarts(prev => prev.map(c => c.id === id ? { ...c, nombre } : c))
+
+  const startRename = (c) => { setEditingCartId(c.id); setEditingName(c.nombre) }
+  const commitRename = () => {
+    if (editingCartId) {
+      const name = editingName.trim()
+      if (name) renameCart(editingCartId, name)
+    }
+    setEditingCartId(null)
+    setEditingName('')
+  }
+  const cancelRename = () => { setEditingCartId(null); setEditingName('') }
+
+  // ── Items ───────────────────────────────────────────────────────────
   const addToCart = (product) => {
     if (product.unidad_medida === 'kg') {
       setGramosInput('')
@@ -57,7 +165,7 @@ export default function POS() {
       toast.error(`Stock máximo disponible: ${product.stock}`)
       return
     }
-    setCart(prev => {
+    updateActiveItems(prev => {
       const ex = prev.find(i => i.product_id === product.id)
       if (ex) return prev.map(i => i.product_id === product.id ? { ...i, cantidad: i.cantidad + 1 } : i)
       return [...prev, { product_id: product.id, nombre: product.nombre, precio_unitario: parseFloat(product.precio), cantidad: 1, es_peso: false }]
@@ -69,7 +177,7 @@ export default function POS() {
     if (!gramos || gramos <= 0) { toast.error('Ingresá una cantidad válida de gramos'); return }
     const p = weightPopup
     const precioTotal = parseFloat(p.precio) * gramos / 1000
-    setCart(prev => {
+    updateActiveItems(prev => {
       const ex = prev.find(i => i.product_id === p.id && i.es_peso)
       if (ex) {
         return prev.map(i =>
@@ -101,17 +209,18 @@ export default function POS() {
         return
       }
     }
-    setCart(prev => prev
+    updateActiveItems(prev => prev
       .map(i => i.product_id === product_id ? { ...i, cantidad: i.cantidad + delta } : i)
       .filter(i => i.cantidad > 0)
     )
   }
 
-  const removeItem = (product_id) => setCart(prev => prev.filter(i => i.product_id !== product_id))
-  const clearCart = () => { setCart([]); setMetodoPago('efectivo') }
+  const removeItem = (product_id) => updateActiveItems(prev => prev.filter(i => i.product_id !== product_id))
+  const clearActiveCart = () => setCarts(prev => prev.map(c => c.id === activeCart.id ? { ...c, items: [], metodoPago: 'efectivo' } : c))
 
   const itemTotal = (i) => i.es_peso ? i.subtotal : i.precio_unitario * i.cantidad
   const total = cart.reduce((s, i) => s + itemTotal(i), 0)
+  const cartCount = (c) => c.items.reduce((s, i) => s + (i.es_peso ? 1 : i.cantidad), 0)
 
   const openModal = () => {
     if (cart.length === 0) return toast.error('Agregá al menos un producto')
@@ -120,6 +229,7 @@ export default function POS() {
   }
 
   const submitSale = async (cliente) => {
+    const saleCart = activeCart
     setShowModal(false)
     setLoading(true)
     try {
@@ -127,11 +237,11 @@ export default function POS() {
         cliente_nombre: cliente.nombre,
         cliente_email: cliente.email || null,
         cliente_whatsapp: cliente.whatsapp || null,
-        metodo_pago: metodoPago,
-        items: cart.map(i => ({ product_id: i.product_id, cantidad: i.es_peso ? i.gramos : i.cantidad })),
+        metodo_pago: saleCart.metodoPago,
+        items: saleCart.items.map(i => ({ product_id: i.product_id, cantidad: i.es_peso ? i.gramos : i.cantidad })),
       })
       setTicket(res.data)
-      clearCart()
+      removeCart(saleCart.id)
       toast.success('¡Venta registrada!')
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error al registrar venta')
@@ -202,13 +312,68 @@ export default function POS() {
       </div>
 
       {/* Panel carrito */}
-      <div className="w-72 flex-shrink-0 flex flex-col gap-0">
-        <div className="card flex flex-col h-full overflow-hidden p-0">
+      <div className="w-72 flex-shrink-0 flex flex-col gap-2 min-h-0">
+        {/* Pestañas de carritos */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 flex-shrink-0">
+          {carts.map(c => {
+            const isActive = c.id === activeCart.id
+            const count = cartCount(c)
+            return (
+              <div
+                key={c.id}
+                className={`group flex items-center gap-1 pl-2.5 pr-1 py-1.5 rounded-xl flex-shrink-0 border transition-colors ${
+                  isActive ? 'bg-mimi-500 border-mimi-500 text-white' : 'bg-white border-[#E5E7EB] text-[#444444] hover:border-mimi-300'
+                }`}
+              >
+                {editingCartId === c.id ? (
+                  <input
+                    autoFocus
+                    value={editingName}
+                    onChange={e => setEditingName(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') cancelRename() }}
+                    className="w-20 text-xs text-[#111111] rounded px-1 py-0.5 border border-mimi-300 outline-none"
+                  />
+                ) : (
+                  <span
+                    onClick={() => setActiveCartId(c.id)}
+                    onDoubleClick={() => startRename(c)}
+                    title="Doble click para renombrar"
+                    className="text-xs font-semibold whitespace-nowrap max-w-[90px] truncate cursor-pointer"
+                  >
+                    {c.nombre}
+                    {count > 0 && <span className={isActive ? 'text-white/80 ml-1' : 'text-mimi-500 ml-1'}>·{count}</span>}
+                  </span>
+                )}
+                {carts.length > 1 && (
+                  <button
+                    onClick={() => removeCart(c.id)}
+                    title="Cerrar carrito"
+                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 ${
+                      isActive ? 'hover:bg-white/25' : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )
+          })}
+          <button
+            onClick={addCart}
+            title="Nuevo carrito"
+            className="flex-shrink-0 w-8 h-8 rounded-xl border border-dashed border-mimi-300 text-mimi-500 font-bold hover:bg-mimi-50 flex items-center justify-center"
+          >
+            +
+          </button>
+        </div>
+
+        <div className="card flex flex-col flex-1 min-h-0 overflow-hidden p-0">
           <div className="px-4 py-3 border-b border-[#E5E7EB]">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-[#111111]">Carrito</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-base font-bold text-[#111111] truncate">{activeCart.nombre}</h2>
               {cart.length > 0 && (
-                <button onClick={clearCart} className="text-xs text-[#444444] hover:text-red-500">Vaciar</button>
+                <button onClick={clearActiveCart} className="text-xs text-[#444444] hover:text-red-500 flex-shrink-0">Vaciar</button>
               )}
             </div>
           </div>

@@ -98,10 +98,11 @@ async function create(req, res, next) {
     const decTotal = decEfectivo + decDebito + decCredito + decTransferencia;
 
     // Detectar diferencia entre lo declarado y lo registrado por el sistema.
-    // Si no coincide y la cajera no confirmó, no guardamos: el front muestra la alerta.
+    // Solo alertamos cuando la diferencia supera el umbral tolerado ($5.000).
+    const UMBRAL_DIFERENCIA = 5000;
     const sistemaTotal = parseFloat(t.monto_total) || 0;
     const diferencia = decTotal - sistemaTotal;
-    if (Math.abs(diferencia) >= 0.01 && !req.body.confirmar_diferencia) {
+    if (Math.abs(diferencia) > UMBRAL_DIFERENCIA && !req.body.confirmar_diferencia) {
       // No exponemos el monto: la cajera no debe ver los valores del sistema.
       return res.status(409).json({ error: 'difference' });
     }

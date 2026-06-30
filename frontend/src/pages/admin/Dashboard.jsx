@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, PieChart, Pie, Legend } from 'recharts'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
@@ -36,6 +36,7 @@ export default function AdminDashboard() {
   const [topProducts, setTopProducts] = useState([])
   const [byCashier, setByCashier] = useState([])
   const [gastosByPeriod, setGastosByPeriod] = useState([])
+  const [gastosDaily, setGastosDaily] = useState([])
   const [dailyResult, setDailyResult] = useState([])
   const [gastosKpi, setGastosKpi] = useState(null)
   const [users, setUsers] = useState([])
@@ -60,7 +61,11 @@ export default function AdminDashboard() {
         const resultParams = new URLSearchParams({ desde, hasta })
         if (localId) resultParams.set('local_id', localId)
 
-        const [r1, r2, r3, r4, r5, r6, r7, r8] = await Promise.all([
+        // Gastos siempre agrupados por día (independiente del selector de período)
+        const gastosDayParams = new URLSearchParams({ desde, hasta, period: 'day' })
+        if (localId) gastosDayParams.set('local_id', localId)
+
+        const [r1, r2, r3, r4, r5, r6, r7, r8, r9] = await Promise.all([
           api.get('/reports/by-local'),
           api.get(`/reports/by-period?${periodParams}`),
           api.get(`/reports/top-products?limit=10&desde=${desde}&hasta=${hasta}`),
@@ -69,6 +74,7 @@ export default function AdminDashboard() {
           api.get(`/reports/daily-result?${resultParams}`),
           api.get(`/reports/gastos-kpi?${resultParams}`),
           api.get(`/reports/gastos-by-period?${periodParams}`),
+          api.get(`/reports/gastos-by-period?${gastosDayParams}`),
         ])
         setByLocal(r1.data)
         setByPeriod(r2.data)
@@ -78,6 +84,7 @@ export default function AdminDashboard() {
         setDailyResult(r6.data)
         setGastosKpi(r7.data)
         setGastosByPeriod(r8.data)
+        setGastosDaily(r9.data)
       } catch { toast.error('Error al cargar reportes') }
     }
     load()
@@ -136,6 +143,34 @@ export default function AdminDashboard() {
         total_merma: parseFloat(row.total_merma),
       }
     })
+
+  // Gastos totales por día (barra)
+  const gastosDiaData = (() => {
+    const map = {}
+    gastosDaily.forEach(row => {
+      const key = row.periodo.substring(0, 10)
+      map[key] = (map[key] || 0) + parseFloat(row.total || 0)
+    })
+    return Object.entries(map)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([key, total]) => {
+        const [, m, d] = key.split('-')
+        return { name: `${d}/${m}`, total }
+      })
+  })()
+
+  // Gastos por tipo (torta)
+  const gastosTipoData = (() => {
+    const map = {}
+    gastosDaily.forEach(row => {
+      map[row.tipo] = (map[row.tipo] || 0) + parseFloat(row.total || 0)
+    })
+    return Object.entries(map)
+      .map(([tipo, total]) => ({ name: tipo, value: total }))
+      .filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value)
+  })()
+  const gastosTipoTotal = gastosTipoData.reduce((s, d) => s + d.value, 0)
 
   return (
     <div className="space-y-6">
@@ -380,6 +415,59 @@ export default function AdminDashboard() {
             </BarChart>
           </ResponsiveContainer>
         )}
+      </div>
+
+      {/* ── Apartado de gastos ── */}
+      <div className="pt-2">
+        <h2 className="text-base font-semibold text-[#111111] mb-3">Gastos</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Gastos por día (barra) */}
+          <div className="card">
+            <h3 className="text-sm font-semibold text-[#111111] mb-4">Gastos por día</h3>
+            {gastosDiaData.length === 0 ? (
+              <p className="text-center text-[#444444] py-10 text-sm">Sin gastos en el período seleccionado</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={gastosDiaData} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#444444' }} />
+                  <YAxis tick={{ fontSize: 11, fill: '#444444' }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+                  <Tooltip formatter={(v) => fmt(v)} labelStyle={{ color: '#111111' }} />
+                  <Bar dataKey="total" fill="#ef4444" radius={[4,4,0,0]} name="Gastos" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Gastos por tipo (torta) */}
+          <div className="card">
+            <h3 className="text-sm font-semibold text-[#111111] mb-4">Gastos por tipo</h3>
+            {gastosTipoData.length === 0 ? (
+              <p className="text-center text-[#444444] py-10 text-sm">Sin gastos en el período seleccionado</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={gastosTipoData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={90}
+                    label={({ value }) => gastosTipoTotal ? `${Math.round(value / gastosTipoTotal * 100)}%` : ''}
+                    labelLine={false}
+                  >
+                    {gastosTipoData.map((entry, i) => (
+                      <Cell key={i} fill={TIPO_COLOR[entry.name] || '#9ca3af'} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v) => fmt(v)} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

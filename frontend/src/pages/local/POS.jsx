@@ -65,6 +65,8 @@ export default function POS() {
   const [ticket, setTicket] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [clienteForm, setClienteForm] = useState({ nombre: '', email: '', whatsapp: '' })
+  const [matchedClient, setMatchedClient] = useState(null)
+  const [lookupLoading, setLookupLoading] = useState(false)
   const [weightPopup, setWeightPopup] = useState(null)
   const [gramosInput, setGramosInput] = useState('')
 
@@ -98,6 +100,34 @@ export default function POS() {
   useEffect(() => {
     if (!carts.some(c => c.id === activeCartId)) setActiveCartId(carts[0].id)
   }, [carts, activeCartId])
+
+  // Buscar cliente por teléfono mientras se carga el pedido (debounce)
+  useEffect(() => {
+    if (!showModal) return
+    const phone = clienteForm.whatsapp.trim()
+    if (phone.length < 5) { setMatchedClient(null); setLookupLoading(false); return }
+    let cancelled = false
+    setLookupLoading(true)
+    const t = setTimeout(async () => {
+      try {
+        const res = await api.get('/loyalty/search', { params: { q: phone } })
+        if (cancelled) return
+        const c = res.data
+        // Sólo es un match si coincide el teléfono (no por nombre via fallback del backend)
+        const isPhoneMatch = c && c.whatsapp && String(c.whatsapp).trim() === phone
+        setMatchedClient(isPhoneMatch ? c : null)
+      } catch {
+        if (!cancelled) setMatchedClient(null)
+      } finally {
+        if (!cancelled) setLookupLoading(false)
+      }
+    }, 400)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [clienteForm.whatsapp, showModal])
+
+  // El nombre sólo es obligatorio si el teléfono no existe en la base o el cliente no tiene nombre
+  const clienteNombreRegistrado = matchedClient?.nombre?.trim() || ''
+  const nombreObligatorio = !clienteNombreRegistrado
 
   const filtered = products.filter(p => {
     const matchSearch = !search || p.nombre.toLowerCase().includes(search.toLowerCase())
@@ -225,6 +255,8 @@ export default function POS() {
   const openModal = () => {
     if (cart.length === 0) return toast.error('Agregá al menos un producto')
     setClienteForm({ nombre: '', email: '', whatsapp: '' })
+    setMatchedClient(null)
+    setLookupLoading(false)
     setShowModal(true)
   }
 
@@ -251,8 +283,14 @@ export default function POS() {
   }
 
   const handleGuardar = () => {
-    if (!clienteForm.nombre.trim()) return toast.error('El nombre del cliente es requerido')
-    submitSale({ nombre: clienteForm.nombre.trim(), email: clienteForm.email, whatsapp: clienteForm.whatsapp })
+    // El nombre tipeado tiene prioridad; si no, usamos el que ya está registrado para ese teléfono
+    const nombre = clienteForm.nombre.trim() || clienteNombreRegistrado
+    if (!nombre) return toast.error('El nombre del cliente es requerido')
+    submitSale({
+      nombre,
+      email: clienteForm.email.trim() || matchedClient?.email || null,
+      whatsapp: clienteForm.whatsapp.trim() || null,
+    })
   }
 
   const handleInvitado = () => {
@@ -450,14 +488,36 @@ export default function POS() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
             <h2 className="text-lg font-bold text-[#111111] mb-1">Datos del cliente</h2>
-            <p className="text-sm text-[#444444] mb-4">Ingresá los datos o continuá como invitado.</p>
+            <p className="text-sm text-[#444444] mb-4">Ingresá el teléfono del cliente o continuá como invitado.</p>
             <div className="space-y-3">
+              <div>
+                <input
+                  className="input-field text-sm"
+                  placeholder="Teléfono / WhatsApp"
+                  value={clienteForm.whatsapp}
+                  onChange={e => setClienteForm(f => ({ ...f, whatsapp: e.target.value }))}
+                  autoFocus
+                />
+                {lookupLoading && (
+                  <p className="text-xs text-[#444444] mt-1 ml-1">Buscando cliente…</p>
+                )}
+                {!lookupLoading && matchedClient && clienteNombreRegistrado && (
+                  <div className="mt-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
+                    <p className="text-sm font-semibold text-green-700">✓ {clienteNombreRegistrado}</p>
+                    <p className="text-xs text-green-600">
+                      {matchedClient.nivel ? `${matchedClient.nivel} · ` : ''}{matchedClient.puntos_vigentes ?? 0} pts · No hace falta cargar el nombre
+                    </p>
+                  </div>
+                )}
+                {!lookupLoading && matchedClient && !clienteNombreRegistrado && (
+                  <p className="text-xs text-orange-600 mt-1 ml-1">Cliente sin nombre registrado — ingresá el nombre.</p>
+                )}
+              </div>
               <input
                 className="input-field text-sm"
-                placeholder="Nombre *"
+                placeholder={nombreObligatorio ? 'Nombre *' : 'Nombre (opcional)'}
                 value={clienteForm.nombre}
                 onChange={e => setClienteForm(f => ({ ...f, nombre: e.target.value }))}
-                autoFocus
               />
               <input
                 className="input-field text-sm"
@@ -465,12 +525,6 @@ export default function POS() {
                 type="email"
                 value={clienteForm.email}
                 onChange={e => setClienteForm(f => ({ ...f, email: e.target.value }))}
-              />
-              <input
-                className="input-field text-sm"
-                placeholder="WhatsApp (opcional)"
-                value={clienteForm.whatsapp}
-                onChange={e => setClienteForm(f => ({ ...f, whatsapp: e.target.value }))}
               />
             </div>
             <div className="flex gap-2 mt-5">

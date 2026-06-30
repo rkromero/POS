@@ -30,6 +30,10 @@ router.get('/movimientos', requireAdmin, ctrl.getMovimientos);
 // Canje
 router.post('/canje', ctrl.canjear);
 
+// Canjes: listado y entrega (todos los locales, cualquier usuario autenticado)
+router.get('/canjes', ctrl.getCanjes);
+router.patch('/canjes/:id/entregar', ctrl.entregarCanje);
+
 // Búsqueda rápida
 router.get('/search', ctrl.searchCliente);
 

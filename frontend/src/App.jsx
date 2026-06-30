@@ -17,6 +17,7 @@ import PedidoFabrica from './pages/local/PedidoFabrica'
 import CierreCaja from './pages/local/CierreCaja'
 import Gastos from './pages/local/Gastos'
 import MermaProductos from './pages/local/MermaProductos'
+import Canjes from './pages/local/Canjes'
 import AdminFactoryOrders from './pages/admin/FactoryOrders'
 import WholesaleClients from './pages/admin/WholesaleClients'
 import WholesaleOrders from './pages/admin/WholesaleOrders'
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="gastos" element={<Gastos />} />
           <Route path="merma" element={<MermaProductos />} />
           <Route path="pedido-fabrica" element={<PedidoFabrica />} />
+          <Route path="canjes" element={<Canjes />} />
         </Route>
         <Route path="/mis-puntos" element={<MisPuntos />} />
         <Route path="*" element={<Navigate to="/login" replace />} />

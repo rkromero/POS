@@ -4,6 +4,7 @@ import Sidebar from '../../components/Sidebar'
 const localLinks = [
   { to: '/local', icon: '🛒', label: 'Caja / POS' },
   { to: '/local/ventas', icon: '📋', label: 'Historial de ventas' },
+  { to: '/local/canjes', icon: '🎁', label: 'Canjes' },
   { to: '/local/cierre-caja', icon: '🔒', label: 'Cierre de Caja' },
   { to: '/local/gastos', icon: '💸', label: 'Gastos' },
   { to: '/local/merma', icon: '🗑️', label: 'Merma Productos' },

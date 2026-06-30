@@ -227,6 +227,76 @@ async function searchCliente(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// ── Canjes (listado para locales) ──────────────────────────────
+const CANJE_SELECT = `
+  SELECT lm.id, lm.puntos, lm.created_at, lm.beneficio_id, lm.client_id,
+         lm.entregado_at, lm.entregado_por, lm.entregado_local_id,
+         lc.nombre AS cliente_nombre, lc.whatsapp AS cliente_whatsapp, lc.email AS cliente_email,
+         lb.nombre AS beneficio_nombre, lb.descripcion AS beneficio_descripcion, lb.tipo AS beneficio_tipo,
+         cu.nombre AS creado_por_nombre,
+         eu.nombre AS entregado_por_nombre,
+         el.nombre AS entregado_local_nombre
+  FROM loyalty_movimientos lm
+  LEFT JOIN loyalty_clients lc ON lc.id = lm.client_id
+  LEFT JOIN loyalty_beneficios lb ON lb.id = lm.beneficio_id
+  LEFT JOIN users cu ON cu.id = lm.creado_por
+  LEFT JOIN users eu ON eu.id = lm.entregado_por
+  LEFT JOIN locals el ON el.id = lm.entregado_local_id
+`;
+
+async function getCanjes(req, res, next) {
+  try {
+    const { estado, search } = req.query;
+    const params = [];
+    const conds = [`lm.tipo = 'canje'`];
+
+    if (estado === 'pendiente') conds.push('lm.entregado_at IS NULL');
+    else if (estado === 'entregado') conds.push('lm.entregado_at IS NOT NULL');
+
+    if (search && search.trim()) {
+      params.push(`%${search.trim()}%`);
+      conds.push(`(lc.nombre ILIKE $${params.length} OR lc.whatsapp ILIKE $${params.length})`);
+    }
+
+    const where = 'WHERE ' + conds.join(' AND ');
+    const r = await pool.query(
+      `${CANJE_SELECT} ${where}
+       ORDER BY (lm.entregado_at IS NOT NULL) ASC, lm.created_at DESC
+       LIMIT 300`,
+      params
+    );
+    res.json(r.rows);
+  } catch (err) { next(err); }
+}
+
+async function entregarCanje(req, res, next) {
+  try {
+    const mov = await pool.query(
+      "SELECT * FROM loyalty_movimientos WHERE id=$1 AND tipo='canje'",
+      [req.params.id]
+    );
+    if (!mov.rows[0]) return res.status(404).json({ error: 'Canje no encontrado' });
+    if (mov.rows[0].entregado_at) {
+      return res.status(400).json({ error: 'Este canje ya fue entregado' });
+    }
+
+    const localId = req.user.role === 'local' ? req.user.local_id : (req.body.local_id || null);
+
+    // El WHERE ... entregado_at IS NULL evita una doble entrega por carrera
+    const upd = await pool.query(
+      `UPDATE loyalty_movimientos
+         SET entregado_at = NOW(), entregado_por = $1, entregado_local_id = $2
+       WHERE id = $3 AND entregado_at IS NULL
+       RETURNING id`,
+      [req.user.id, localId, req.params.id]
+    );
+    if (!upd.rows[0]) return res.status(400).json({ error: 'Este canje ya fue entregado' });
+
+    const full = await pool.query(`${CANJE_SELECT} WHERE lm.id = $1`, [req.params.id]);
+    res.json(full.rows[0]);
+  } catch (err) { next(err); }
+}
+
 // ── Dashboard ──────────────────────────────────────────────────
 async function getDashboard(req, res, next) {
   try {
@@ -302,5 +372,6 @@ module.exports = {
   getBeneficios, createBeneficio, updateBeneficio, deleteBeneficio,
   getClientes, getClienteDetail, ajustarPuntos,
   canjear, searchCliente,
+  getCanjes, entregarCanje,
   getDashboard, getMovimientos,
 };

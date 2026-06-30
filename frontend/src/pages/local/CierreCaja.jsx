@@ -298,12 +298,13 @@ export default function CierreCaja() {
           ) : historial.length === 0 ? (
             <div className="card p-6 text-center text-[#444444] text-sm">No hay cierres registrados</div>
           ) : (
-            <div className="card p-0 overflow-hidden">
+            <div className="card p-0">
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-mimi-50 border-b border-[#E5E7EB]">
                     <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide text-[#444444]">Fecha</th>
-                    {isAdmin && <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide text-[#444444]">Cajera</th>}
+                    <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide text-[#444444]">Cajera</th>
                     <th className="text-right py-3 px-4 text-xs font-semibold uppercase tracking-wide text-[#444444]">Efectivo</th>
                     <th className="text-right py-3 px-4 text-xs font-semibold uppercase tracking-wide text-[#444444]">Digital</th>
                     <th className="text-right py-3 px-4 text-xs font-semibold uppercase tracking-wide text-[#444444]">Total</th>
@@ -326,7 +327,7 @@ export default function CierreCaja() {
                             {parseTS(c.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </td>
-                        {isAdmin && <td className="py-3 px-4 text-[#111111]">{c.user_nombre}</td>}
+                        <td className="py-3 px-4 text-[#111111]">{c.user_nombre}</td>
                         <td className="py-3 px-4 text-right text-[#111111]">{fmt(efectivo)}</td>
                         <td className="py-3 px-4 text-right text-[#111111]">{fmt(digital)}</td>
                         <td className="py-3 px-4 text-right font-bold text-mimi-500">{fmt(total)}</td>
@@ -335,6 +336,7 @@ export default function CierreCaja() {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </>

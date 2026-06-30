@@ -118,8 +118,8 @@ async function getAll(req, res, next) {
     const params = [];
     const conditions = [];
 
+    // El local ve todos los cierres de SU sucursal (todas las cajeras), no sólo los propios
     if (local_id) { params.push(local_id); conditions.push(`cc.local_id = $${params.length}`); }
-    if (!isAdmin) { params.push(req.user.id); conditions.push(`cc.user_id = $${params.length}`); }
 
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
     const result = await pool.query(

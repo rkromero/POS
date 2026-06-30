@@ -30,7 +30,7 @@ export default function POS() {
     async function load() {
       try {
         const [pr, cr] = await Promise.all([
-          api.get('/products?activo=true&limit=200'),
+          api.get('/products?activo=true&limit=1000'),
           api.get('/categories'),
         ])
         setProducts(pr.data.data)

@@ -110,8 +110,8 @@ export default function WholesaleClients() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[#111111]">Clientes Mayoristas</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 gap-y-2 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#111111]">Clientes Mayoristas</h1>
         <div className="flex gap-2">
           <Link to="/admin/mayoristas/nuevo-pedido" className="btn-secondary text-sm px-4 py-2">
             + Nuevo Pedido
@@ -178,7 +178,7 @@ export default function WholesaleClients() {
                     <p className="text-sm text-[#444444]">Cargando detalle...</p>
                   ) : detail ? (
                     <>
-                      <div className="grid grid-cols-3 gap-3 mb-5">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
                         <div className="bg-blue-50 rounded-lg p-3 text-center">
                           <p className="text-xs text-blue-600 mb-1">Total Vendido</p>
                           <p className="text-lg font-bold text-blue-700">{fmt(detail.total_ventas)}</p>
@@ -296,7 +296,7 @@ export default function WholesaleClients() {
 
       {showClientForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-[#111111] mb-4">
               {editingClient ? 'Editar Cliente' : 'Nuevo Cliente Mayorista'}
             </h2>
@@ -345,7 +345,7 @@ export default function WholesaleClients() {
 
       {showPaymentForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-[#111111] mb-1">Registrar Pago</h2>
             <p className="text-sm text-[#444444] mb-4">{detail?.nombre}</p>
             {detail && (

@@ -57,8 +57,8 @@ export default function AdminProducts() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[#111111]">Productos</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 gap-y-2 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#111111]">Productos</h1>
         <button onClick={openCreate} className="btn-primary">+ Nuevo producto</button>
       </div>
 
@@ -71,8 +71,9 @@ export default function AdminProducts() {
         </select>
       </div>
 
-      <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="card p-0">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="bg-mimi-50">
               {['Nombre','Categoría','Unidad','Precio C.F.','Precio May.','Stock','Estado',''].map((h,i) => (
@@ -113,6 +114,7 @@ export default function AdminProducts() {
             {products.length === 0 && <tr><td colSpan="6" className="text-center py-8 text-[#444444]">No se encontraron productos</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="flex justify-between items-center mt-4 text-sm text-[#444444]">
@@ -125,7 +127,7 @@ export default function AdminProducts() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="card w-full max-w-md">
+          <div className="card w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold mb-4">{editing ? 'Editar producto' : 'Nuevo producto'}</h2>
             <form onSubmit={save} className="space-y-3">
               <div><label className="block text-sm font-medium mb-1">Nombre *</label><input className="input-field" value={form.nombre} onChange={e => set('nombre', e.target.value)} required /></div>

@@ -77,7 +77,7 @@ export default function AdminCierresCaja() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Cierres de Caja</h1>
+      <h1 className="text-xl sm:text-2xl font-bold mb-6">Cierres de Caja</h1>
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b">
@@ -136,7 +136,7 @@ export default function AdminCierresCaja() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm bg-white rounded-xl shadow">
+              <table className="w-full text-sm bg-white rounded-xl shadow min-w-[640px]">
                 <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
                   <tr>
                     <th className="px-4 py-3 text-left">Sucursal</th>
@@ -230,7 +230,7 @@ export default function AdminCierresCaja() {
       {/* Tab: Detalle por cajero */}
       {tab === 'detalle' && (
         <div>
-          <div className="flex gap-4 mb-6">
+          <div className="flex flex-wrap gap-3 mb-6">
             <select className="border rounded px-3 py-2 text-sm" value={filtroLocal}
               onChange={e => { setFiltroLocal(e.target.value); setFiltroUsuario('') }}>
               <option value="">Todos los locales</option>
@@ -249,7 +249,7 @@ export default function AdminCierresCaja() {
             <p className="text-gray-500">No hay cierres registrados.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm bg-white rounded-xl shadow">
+              <table className="w-full text-sm bg-white rounded-xl shadow min-w-[640px]">
                 <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
                   <tr>
                     <th className="px-4 py-3 text-left">Fecha</th>

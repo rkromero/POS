@@ -139,7 +139,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-[#111111]">Dashboard</h1>
+      <h1 className="text-xl sm:text-2xl font-bold text-[#111111]">Dashboard</h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard title="Total ventas" value={totalVentas} />
@@ -249,10 +249,11 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Comparativa por local */}
-        <div className="card p-0 overflow-hidden">
+        <div className="card p-0">
           <div className="px-6 py-4 border-b border-[#E5E7EB]">
             <h2 className="text-base font-semibold text-[#111111]">Comparativa por local</h2>
           </div>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-mimi-50">
@@ -272,13 +273,15 @@ export default function AdminDashboard() {
               {byLocal.length === 0 && <tr><td colSpan="3" className="text-center py-6 text-[#444444]">Sin datos</td></tr>}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Top productos */}
-        <div className="card p-0 overflow-hidden">
+        <div className="card p-0">
           <div className="px-6 py-4 border-b border-[#E5E7EB]">
             <h2 className="text-base font-semibold text-[#111111]">Productos más vendidos</h2>
           </div>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-mimi-50">
@@ -300,11 +303,12 @@ export default function AdminDashboard() {
               {topProducts.length === 0 && <tr><td colSpan="4" className="text-center py-6 text-[#444444]">Sin datos</td></tr>}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
       {/* Ventas por cajero */}
-      <div className="card p-0 overflow-hidden">
+      <div className="card p-0">
         <div className="px-6 py-4 border-b border-[#E5E7EB] flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-[#111111]">Ventas por cajero</h2>
           <div className="flex items-center gap-2">
@@ -321,6 +325,7 @@ export default function AdminDashboard() {
             </select>
           </div>
         </div>
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-mimi-50">
@@ -342,6 +347,7 @@ export default function AdminDashboard() {
             {byCashier.length === 0 && <tr><td colSpan="4" className="text-center py-6 text-[#444444]">Sin datos</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Resultado diario */}

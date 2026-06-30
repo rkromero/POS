@@ -17,7 +17,7 @@ export default function AdminLayout() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar links={adminLinks} />
-      <main className="flex-1 p-8 overflow-auto min-w-0">
+      <main className="flex-1 min-w-0 overflow-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8 pt-[4.5rem] md:pt-8">
         <Outlet />
       </main>
     </div>

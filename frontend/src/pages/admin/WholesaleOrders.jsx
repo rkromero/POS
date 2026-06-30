@@ -93,7 +93,7 @@ export default function WholesaleOrders() {
         >
           ← Volver
         </button>
-        <h1 className="text-2xl font-bold text-[#111111]">Nuevo Pedido Mayorista</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-[#111111]">Nuevo Pedido Mayorista</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">

@@ -23,8 +23,8 @@ export default function Fidelizacion() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#111111]">Fidelización por Puntos</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 gap-y-2">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#111111]">Fidelización por Puntos</h1>
         <div className="flex gap-2 flex-wrap">
           {tabs.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
@@ -201,11 +201,12 @@ function Clientes() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-3">
         <input className="input-field flex-1" placeholder="Buscar por nombre, WhatsApp o email..." value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
       </div>
-      <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="card p-0">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="bg-mimi-50">
               <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide text-[#444444]">Cliente</th>
@@ -228,6 +229,7 @@ function Clientes() {
             {clientes.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-[#444444]">No hay clientes registrados aún</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
       {total > 30 && (
         <div className="flex justify-between items-center text-sm text-[#444444]">
@@ -256,8 +258,9 @@ function Movimientos() {
 
   return (
     <div className="space-y-4">
-      <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="card p-0">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="bg-mimi-50">
               <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide text-[#444444]">Fecha</th>
@@ -280,6 +283,7 @@ function Movimientos() {
             {movs.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-[#444444]">Sin movimientos aún</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
       {total > 30 && (
         <div className="flex justify-between items-center text-sm text-[#444444]">
@@ -405,8 +409,9 @@ function Beneficios() {
       <div className="flex justify-end">
         <button onClick={openCreate} className="btn-primary">+ Nuevo beneficio</button>
       </div>
-      <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="card p-0">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="bg-mimi-50">
               <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide text-[#444444]">Beneficio</th>
@@ -429,11 +434,12 @@ function Beneficios() {
             {beneficios.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-[#444444]">No hay beneficios configurados</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="card w-full max-w-md">
+          <div className="card w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold mb-4">{editing ? 'Editar beneficio' : 'Nuevo beneficio'}</h2>
             <form onSubmit={save} className="space-y-3">
               <div>

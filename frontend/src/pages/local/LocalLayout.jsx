@@ -16,7 +16,7 @@ export default function LocalLayout() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar links={localLinks} />
-      <main className="flex-1 p-6 overflow-auto min-w-0">
+      <main className="flex-1 min-w-0 overflow-auto px-4 sm:px-6 pb-6 pt-[4.5rem] md:pt-6">
         <Outlet />
       </main>
     </div>

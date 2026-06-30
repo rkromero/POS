@@ -36,8 +36,8 @@ export default function AdminCategories() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[#111111]">Categorías</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 gap-y-2 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#111111]">Categorías</h1>
         <button onClick={openCreate} className="btn-primary">+ Nueva categoría</button>
       </div>
 
@@ -59,7 +59,7 @@ export default function AdminCategories() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="card w-full max-w-sm">
+          <div className="card w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold mb-4">{editing ? 'Editar' : 'Nueva'} categoría</h2>
             <form onSubmit={save} className="space-y-3">
               <div>

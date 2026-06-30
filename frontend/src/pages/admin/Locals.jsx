@@ -113,13 +113,14 @@ export default function AdminLocals() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[#111111]">Sucursales</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 gap-y-2 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#111111]">Sucursales</h1>
         <button onClick={openCreate} className="btn-primary">+ Nueva sucursal</button>
       </div>
 
-      <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="card p-0">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="bg-mimi-50">
               <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wide text-[#444444]">Nombre</th>
@@ -150,6 +151,7 @@ export default function AdminLocals() {
             {locals.length === 0 && <tr><td colSpan="5" className="text-center py-8 text-[#444444]">No hay sucursales registradas</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       {total > 20 && (
@@ -165,7 +167,7 @@ export default function AdminLocals() {
       {/* Modal crear/editar sucursal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="card w-full max-w-md">
+          <div className="card w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold mb-4">{editing ? 'Editar sucursal' : 'Nueva sucursal'}</h2>
             <form onSubmit={save} className="space-y-3">
               <div>

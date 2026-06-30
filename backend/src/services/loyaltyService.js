@@ -80,7 +80,8 @@ async function awardPoints(sale) {
       }
     }
 
-    const puntos = Math.floor(parseFloat(sale.total) / parseFloat(cfg.monto_base)) * cfg.puntos_por_monto;
+    // Puntos proporcionales al monto (sin perder los restos por bloque)
+    const puntos = Math.round(parseFloat(sale.total) / parseFloat(cfg.monto_base) * cfg.puntos_por_monto);
     if (puntos <= 0) return;
 
     const fechaVenc = new Date();

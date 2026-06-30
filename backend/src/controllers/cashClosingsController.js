@@ -102,11 +102,8 @@ async function create(req, res, next) {
     const sistemaTotal = parseFloat(t.monto_total) || 0;
     const diferencia = decTotal - sistemaTotal;
     if (Math.abs(diferencia) >= 0.01 && !req.body.confirmar_diferencia) {
-      return res.status(409).json({
-        error: 'difference',
-        diferencia,
-        declarado_total: decTotal,
-      });
+      // No exponemos el monto: la cajera no debe ver los valores del sistema.
+      return res.status(409).json({ error: 'difference' });
     }
 
     const result = await pool.query(

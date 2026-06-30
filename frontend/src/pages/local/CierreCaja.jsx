@@ -79,10 +79,7 @@ export default function CierreCaja() {
       loadSummary()
     } catch (err) {
       if (err.response?.status === 409 && err.response.data?.error === 'difference') {
-        setDiffModal({
-          diferencia: parseFloat(err.response.data.diferencia),
-          declarado: parseFloat(err.response.data.declarado_total),
-        })
+        setDiffModal(true)
         return
       }
       toast.error(err.response?.data?.error || 'Error al registrar cierre')
@@ -362,13 +359,8 @@ export default function CierreCaja() {
               <h3 className="text-lg font-bold text-[#111111]">Diferencia en la caja</h3>
             </div>
             <p className="text-sm text-[#444444]">
-              Lo declarado no coincide con lo registrado en el sistema. Hay una diferencia de{' '}
-              <span className={`font-bold ${diffModal.diferencia < 0 ? 'text-red-600' : 'text-amber-600'}`}>
-                {fmt(Math.abs(diffModal.diferencia))} {diffModal.diferencia < 0 ? '(faltante)' : '(sobrante)'}
-              </span>.
-            </p>
-            <p className="text-sm text-[#444444]">
-              Si continuás, el cierre se va a guardar con esa diferencia.
+              Lo declarado no coincide con lo registrado en el sistema. Si continuás,
+              el cierre se va a guardar con esa diferencia.
             </p>
             <div className="flex gap-3 pt-1">
               <button

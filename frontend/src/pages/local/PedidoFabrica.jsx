@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
-
-const fmt = (v) => `$${parseFloat(v).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+import RemitoFabrica from '../../components/RemitoFabrica'
 
 const ESTADO_BADGE = {
   nuevo: 'bg-yellow-100 text-yellow-700',
   completado: 'bg-green-100 text-green-700',
+  recepcionado: 'bg-blue-100 text-blue-700',
 }
 
 export default function PedidoFabrica() {
@@ -20,6 +20,13 @@ export default function PedidoFabrica() {
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState([])
   const [loadingOrders, setLoadingOrders] = useState(false)
+  const [expanded, setExpanded] = useState(null)
+  const [detail, setDetail] = useState({})
+  const [recMode, setRecMode] = useState(null)
+  const [recItems, setRecItems] = useState({})
+  const [recNotas, setRecNotas] = useState('')
+  const [savingRec, setSavingRec] = useState(false)
+  const [remito, setRemito] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -46,6 +53,46 @@ export default function PedidoFabrica() {
       setOrders(res.data)
     } catch { toast.error('Error al cargar pedidos') }
     finally { setLoadingOrders(false) }
+  }
+
+  async function toggleDetail(id) {
+    if (recMode) return
+    if (expanded === id) { setExpanded(null); return }
+    setExpanded(id)
+    if (detail[id]) return
+    try {
+      const res = await api.get(`/factory-orders/${id}`)
+      setDetail(prev => ({ ...prev, [id]: res.data }))
+    } catch { toast.error('Error al cargar detalle') }
+  }
+
+  function startReception(order) {
+    const items = detail[order.id]?.items || []
+    const init = {}
+    items.forEach(i => { init[i.id] = String(i.cantidad_recibida != null ? i.cantidad_recibida : i.cantidad) })
+    setRecItems(init)
+    setRecNotas(detail[order.id]?.notas_recepcion || '')
+    setExpanded(order.id)
+    setRecMode(order.id)
+  }
+
+  async function saveReception(id) {
+    const items = detail[id]?.items || []
+    setSavingRec(true)
+    try {
+      const res = await api.patch(`/factory-orders/${id}/receive`, {
+        items: items.map(i => ({ item_id: i.id, cantidad_recibida: parseInt(recItems[i.id], 10) || 0 })),
+        notas_recepcion: recNotas || null,
+      })
+      setDetail(prev => ({ ...prev, [id]: res.data }))
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, estado: 'recepcionado' } : o))
+      setRecMode(null)
+      toast.success('Recepción registrada')
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al recepcionar')
+    } finally {
+      setSavingRec(false)
+    }
   }
 
   const filtered = products.filter(p => {
@@ -208,25 +255,119 @@ export default function PedidoFabrica() {
             <p className="text-center text-[#444444] py-12">No tenés pedidos aún</p>
           ) : (
             <div className="space-y-3">
-              {orders.map(o => (
-                <div key={o.id} className="card p-4">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-bold text-[#111111]">Pedido #{o.id}</span>
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold capitalize ${ESTADO_BADGE[o.estado]}`}>
-                      {o.estado}
-                    </span>
+              {orders.map(o => {
+                const det = detail[o.id]
+                const recibido = o.estado === 'recepcionado'
+                const isOpen = expanded === o.id
+                const inRec = recMode === o.id
+                return (
+                  <div key={o.id} className="card p-0 overflow-hidden">
+                    <button onClick={() => toggleDetail(o.id)} className="w-full p-4 text-left hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-bold text-[#111111]">Pedido #{o.id}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-2.5 py-1 rounded-full font-semibold capitalize ${ESTADO_BADGE[o.estado]}`}>
+                            {o.estado}
+                          </span>
+                          <span className="text-[#444444] text-sm">{isOpen ? '▲' : '▼'}</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-[#444444]">
+                        Entrega: {new Date(o.fecha_entrega).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                      </p>
+                      {o.notas && <p className="text-xs text-[#444444] mt-1">Nota: {o.notas}</p>}
+                    </button>
+
+                    {isOpen && (
+                      <div className="border-t border-[#E5E7EB] p-4">
+                        {!det ? (
+                          <p className="text-sm text-[#444444]">Cargando detalle...</p>
+                        ) : inRec ? (
+                          <>
+                            <p className="text-xs text-[#444444] mb-2">Ingresá las cantidades que realmente llegaron:</p>
+                            <div className="space-y-1.5 mb-3">
+                              {det.items.map(item => (
+                                <div key={item.id} className="flex items-center gap-2">
+                                  <span className="flex-1 text-sm text-[#111111] truncate">{item.producto_nombre}</span>
+                                  <span className="text-xs text-[#444444]">Pedido: <b>{item.cantidad}</b></span>
+                                  <input
+                                    type="number" min="0" step="1"
+                                    className="input-field w-20 text-sm text-center py-1"
+                                    value={recItems[item.id] ?? ''}
+                                    onChange={e => setRecItems(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                            <textarea
+                              className="input-field text-sm py-1.5 resize-none mb-3"
+                              rows={2}
+                              placeholder="Notas de la recepción (diferencias, faltantes, etc.)"
+                              value={recNotas}
+                              onChange={e => setRecNotas(e.target.value)}
+                            />
+                            <div className="flex gap-2">
+                              <button onClick={() => saveReception(o.id)} disabled={savingRec} className="btn-primary py-2 px-4 text-sm">
+                                {savingRec ? 'Guardando...' : '✓ Confirmar recepción'}
+                              </button>
+                              <button onClick={() => setRecMode(null)} className="btn-secondary py-2 px-4 text-sm">Cancelar</button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="overflow-x-auto mb-3">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="text-[#444444] border-b border-[#E5E7EB]">
+                                    <th className="text-left py-1.5 font-semibold">Producto</th>
+                                    <th className="text-center py-1.5 font-semibold">Pedido</th>
+                                    {recibido && <th className="text-center py-1.5 font-semibold">Recibido</th>}
+                                    {recibido && <th className="text-center py-1.5 font-semibold">Dif.</th>}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {det.items.map(item => {
+                                    const d = item.cantidad_recibida == null ? null : item.cantidad_recibida - item.cantidad
+                                    return (
+                                      <tr key={item.id} className="border-b border-gray-50">
+                                        <td className="py-1.5 text-[#111111]">{item.producto_nombre}</td>
+                                        <td className="py-1.5 text-center font-semibold">{item.cantidad}</td>
+                                        {recibido && <td className="py-1.5 text-center">{item.cantidad_recibida == null ? '—' : item.cantidad_recibida}</td>}
+                                        {recibido && (
+                                          <td className={`py-1.5 text-center font-semibold ${d ? 'text-red-600' : 'text-green-600'}`}>
+                                            {d == null ? '' : d === 0 ? 'OK' : d > 0 ? `+${d}` : d}
+                                          </td>
+                                        )}
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                            {recibido && det.notas_recepcion && (
+                              <p className="text-xs text-blue-700 mb-3 bg-blue-50 rounded-lg p-2">Recepción: {det.notas_recepcion}</p>
+                            )}
+                            <div className="flex flex-wrap gap-2">
+                              <button onClick={() => setRemito(det)} className="btn-secondary py-2 px-4 text-sm">🖨️ Imprimir remito</button>
+                              {!recibido ? (
+                                <button onClick={() => startReception(o)} className="btn-primary py-2 px-4 text-sm">📥 Recepcionar pedido</button>
+                              ) : (
+                                <button onClick={() => startReception(o)} className="btn-secondary py-2 px-4 text-sm">Editar recepción</button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-[#444444]">
-                    Entrega: {new Date(o.fecha_entrega).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                  </p>
-                  {o.notas && <p className="text-xs text-[#444444] mt-1">Nota: {o.notas}</p>}
-                  <p className="text-xs text-[#444444] mt-1">Creado: {new Date(o.created_at).toLocaleString('es-AR')}</p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
       )}
+
+      {remito && <RemitoFabrica order={remito} onClose={() => setRemito(null)} />}
     </div>
   )
 }

@@ -7,5 +7,6 @@ router.get('/', c.getAll);
 router.get('/:id', c.getById);
 router.post('/', c.create);
 router.patch('/:id/complete', c.complete);
+router.patch('/:id/receive', c.receive);
 
 module.exports = router;

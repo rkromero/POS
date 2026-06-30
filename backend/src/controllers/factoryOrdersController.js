@@ -18,10 +18,12 @@ async function getAll(req, res, next) {
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
 
     const result = await pool.query(
-      `SELECT fo.*, l.nombre as local_nombre, u.nombre as user_nombre
+      `SELECT fo.*, l.nombre as local_nombre, u.nombre as user_nombre,
+              ru.nombre as recepcionado_por_nombre
        FROM factory_orders fo
        JOIN locals l ON l.id = fo.local_id
        JOIN users u ON u.id = fo.user_id
+       LEFT JOIN users ru ON ru.id = fo.recepcionado_por
        ${where}
        ORDER BY fo.created_at DESC`,
       params
@@ -33,10 +35,12 @@ async function getAll(req, res, next) {
 async function getById(req, res, next) {
   try {
     const order = await pool.query(
-      `SELECT fo.*, l.nombre as local_nombre, u.nombre as user_nombre
+      `SELECT fo.*, l.nombre as local_nombre, u.nombre as user_nombre,
+              ru.nombre as recepcionado_por_nombre
        FROM factory_orders fo
        JOIN locals l ON l.id = fo.local_id
        JOIN users u ON u.id = fo.user_id
+       LEFT JOIN users ru ON ru.id = fo.recepcionado_por
        WHERE fo.id = $1`,
       [req.params.id]
     );
@@ -131,4 +135,58 @@ async function complete(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { getAll, getById, create, complete };
+// Recepción: el local que hizo el pedido carga las cantidades que realmente llegaron
+async function receive(req, res, next) {
+  const client = await pool.connect();
+  try {
+    const { items, notas_recepcion } = req.body;
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: 'Debe indicar las cantidades recibidas' });
+    }
+
+    const orderRes = await client.query('SELECT * FROM factory_orders WHERE id=$1', [req.params.id]);
+    const order = orderRes.rows[0];
+    if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
+
+    // Sólo el local dueño del pedido (o un admin) puede recepcionar
+    if (req.user.role === 'local' && order.local_id !== req.user.local_id) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    await client.query('BEGIN');
+
+    for (const it of items) {
+      const raw = Number(it.cantidad_recibida);
+      if (!Number.isFinite(raw)) continue;
+      const cant = Math.max(0, Math.trunc(raw));
+      await client.query(
+        'UPDATE factory_order_items SET cantidad_recibida=$1 WHERE id=$2 AND order_id=$3',
+        [cant, it.item_id, req.params.id]
+      );
+    }
+
+    const upd = await client.query(
+      `UPDATE factory_orders
+         SET estado='recepcionado', recepcionado_at=NOW(), recepcionado_por=$1, notas_recepcion=$2
+       WHERE id=$3 RETURNING *`,
+      [req.user.id, notas_recepcion || null, req.params.id]
+    );
+
+    await client.query('COMMIT');
+
+    const fullItems = await pool.query(
+      `SELECT foi.*, p.nombre as producto_nombre
+       FROM factory_order_items foi JOIN products p ON p.id=foi.product_id
+       WHERE foi.order_id=$1`,
+      [req.params.id]
+    );
+    res.json({ ...upd.rows[0], items: fullItems.rows });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { getAll, getById, create, complete, receive };

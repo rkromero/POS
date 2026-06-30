@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import RemitoFabrica from '../../components/RemitoFabrica'
 
 const ESTADO_BADGE = {
   nuevo: 'bg-yellow-100 text-yellow-700',
   completado: 'bg-green-100 text-green-700',
+  recepcionado: 'bg-blue-100 text-blue-700',
 }
 
 export default function FactoryOrders() {
@@ -14,6 +16,7 @@ export default function FactoryOrders() {
   const [expanded, setExpanded] = useState(null)
   const [orderDetail, setOrderDetail] = useState({})
   const [completing, setCompleting] = useState(null)
+  const [remito, setRemito] = useState(null)
 
   useEffect(() => { loadOrders() }, [estadoFilter])
 
@@ -105,41 +108,80 @@ export default function FactoryOrders() {
                 <div className="border-t border-[#E5E7EB] px-5 py-4">
                   {!orderDetail[o.id] ? (
                     <p className="text-sm text-[#444444]">Cargando detalle...</p>
-                  ) : (
-                    <>
-                      <div className="space-y-1.5 mb-4">
-                        {orderDetail[o.id].items.map(item => (
-                          <div key={item.id} className="flex justify-between text-sm">
-                            <span className="text-[#111111]">{item.producto_nombre}</span>
-                            <span className="font-semibold text-[#111111]">× {item.cantidad}</span>
-                          </div>
-                        ))}
-                      </div>
-                      {orderDetail[o.id].notas && (
-                        <p className="text-xs text-[#444444] mb-4 bg-gray-50 rounded-lg p-2">
-                          Nota: {orderDetail[o.id].notas}
+                  ) : (() => {
+                    const det = orderDetail[o.id]
+                    const recibido = det.estado === 'recepcionado'
+                    return (
+                      <>
+                        <div className="overflow-x-auto mb-4">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-[#444444] border-b border-[#E5E7EB]">
+                                <th className="text-left py-1.5 font-semibold">Producto</th>
+                                <th className="text-center py-1.5 font-semibold">Pedido</th>
+                                {recibido && <th className="text-center py-1.5 font-semibold">Recibido</th>}
+                                {recibido && <th className="text-center py-1.5 font-semibold">Dif.</th>}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {det.items.map(item => {
+                                const d = item.cantidad_recibida == null ? null : item.cantidad_recibida - item.cantidad
+                                return (
+                                  <tr key={item.id} className="border-b border-gray-50">
+                                    <td className="py-1.5 text-[#111111]">{item.producto_nombre}</td>
+                                    <td className="py-1.5 text-center font-semibold">{item.cantidad}</td>
+                                    {recibido && <td className="py-1.5 text-center">{item.cantidad_recibida == null ? '—' : item.cantidad_recibida}</td>}
+                                    {recibido && (
+                                      <td className={`py-1.5 text-center font-semibold ${d ? 'text-red-600' : 'text-green-600'}`}>
+                                        {d == null ? '' : d === 0 ? 'OK' : d > 0 ? `+${d}` : d}
+                                      </td>
+                                    )}
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        {det.notas && (
+                          <p className="text-xs text-[#444444] mb-2 bg-gray-50 rounded-lg p-2">
+                            Nota: {det.notas}
+                          </p>
+                        )}
+                        {recibido && (
+                          <p className="text-xs text-blue-700 mb-3 bg-blue-50 rounded-lg p-2">
+                            Recepcionado por {det.recepcionado_por_nombre || '—'}
+                            {det.recepcionado_at ? ` · ${new Date(det.recepcionado_at).toLocaleString('es-AR')}` : ''}
+                            {det.notas_recepcion ? ` — ${det.notas_recepcion}` : ''}
+                          </p>
+                        )}
+                        <p className="text-xs text-[#444444] mb-3">
+                          Creado: {new Date(o.created_at).toLocaleString('es-AR')}
                         </p>
-                      )}
-                      <p className="text-xs text-[#444444] mb-3">
-                        Creado: {new Date(o.created_at).toLocaleString('es-AR')}
-                      </p>
-                      {o.estado === 'nuevo' && (
-                        <button
-                          onClick={() => handleComplete(o.id)}
-                          disabled={completing === o.id}
-                          className="btn-primary py-2 px-5 text-sm"
-                        >
-                          {completing === o.id ? 'Procesando...' : '✓ Marcar como entregado'}
-                        </button>
-                      )}
-                    </>
-                  )}
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => setRemito(det)} className="btn-secondary py-2 px-4 text-sm">
+                            🖨️ Imprimir remito
+                          </button>
+                          {o.estado === 'nuevo' && (
+                            <button
+                              onClick={() => handleComplete(o.id)}
+                              disabled={completing === o.id}
+                              className="btn-primary py-2 px-5 text-sm"
+                            >
+                              {completing === o.id ? 'Procesando...' : '✓ Marcar como entregado'}
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )
+                  })()}
                 </div>
               )}
             </div>
           ))}
         </div>
       )}
+
+      {remito && <RemitoFabrica order={remito} onClose={() => setRemito(null)} />}
     </div>
   )
 }

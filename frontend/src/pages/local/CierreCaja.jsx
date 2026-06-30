@@ -29,6 +29,7 @@ export default function CierreCaja() {
   const [historial, setHistorial] = useState([])
   const [tab, setTab] = useState('hoy')
   const [declarado, setDeclarado] = useState({ efectivo: '', debito: '', credito: '', transferencia: '' })
+  const [diffModal, setDiffModal] = useState(null)
 
   useEffect(() => {
     if (tab === 'hoy') loadSummary()
@@ -53,12 +54,13 @@ export default function CierreCaja() {
     finally { setLoading(false) }
   }
 
-  async function handleCerrar() {
-    const fechaLabel = new Date(fecha + 'T12:00:00').toLocaleDateString('es-AR', {
-      weekday: 'long', day: 'numeric', month: 'long'
-    })
+  function handleCerrar() {
+    // Primer intento sin confirmar: si la caja no da exacta, el backend
+    // responde 409 y mostramos la alerta de diferencia.
+    doCerrar(false)
+  }
 
-    if (!confirm(`¿Confirmar cierre de turno del ${fechaLabel}?`)) return
+  async function doCerrar(confirmarDiferencia) {
     setClosing(true)
     try {
       await api.post('/cash-closings', {
@@ -68,12 +70,21 @@ export default function CierreCaja() {
         declarado_debito: parseFloat(declarado.debito) || 0,
         declarado_credito: parseFloat(declarado.credito) || 0,
         declarado_transferencia: parseFloat(declarado.transferencia) || 0,
+        confirmar_diferencia: confirmarDiferencia,
       })
       toast.success('Cierre de turno registrado')
       setDeclarado({ efectivo: '', debito: '', credito: '', transferencia: '' })
       setNotas('')
+      setDiffModal(null)
       loadSummary()
     } catch (err) {
+      if (err.response?.status === 409 && err.response.data?.error === 'difference') {
+        setDiffModal({
+          diferencia: parseFloat(err.response.data.diferencia),
+          declarado: parseFloat(err.response.data.declarado_total),
+        })
+        return
+      }
       toast.error(err.response?.data?.error || 'Error al registrar cierre')
     } finally { setClosing(false) }
   }
@@ -340,6 +351,43 @@ export default function CierreCaja() {
             </div>
           )}
         </>
+      )}
+
+      {/* Alerta: la caja no da exacta */}
+      {diffModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚠️</span>
+              <h3 className="text-lg font-bold text-[#111111]">Diferencia en la caja</h3>
+            </div>
+            <p className="text-sm text-[#444444]">
+              Lo declarado no coincide con lo registrado en el sistema. Hay una diferencia de{' '}
+              <span className={`font-bold ${diffModal.diferencia < 0 ? 'text-red-600' : 'text-amber-600'}`}>
+                {fmt(Math.abs(diffModal.diferencia))} {diffModal.diferencia < 0 ? '(faltante)' : '(sobrante)'}
+              </span>.
+            </p>
+            <p className="text-sm text-[#444444]">
+              Si continuás, el cierre se va a guardar con esa diferencia.
+            </p>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setDiffModal(null)}
+                disabled={closing}
+                className="btn-secondary flex-1 py-2.5"
+              >
+                Volver
+              </button>
+              <button
+                onClick={() => doCerrar(true)}
+                disabled={closing}
+                className="btn-primary flex-1 py-2.5"
+              >
+                {closing ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

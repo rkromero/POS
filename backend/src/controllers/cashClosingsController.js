@@ -97,6 +97,18 @@ async function create(req, res, next) {
     const decTransferencia = parseFloat(declarado_transferencia) || 0;
     const decTotal = decEfectivo + decDebito + decCredito + decTransferencia;
 
+    // Detectar diferencia entre lo declarado y lo registrado por el sistema.
+    // Si no coincide y la cajera no confirmó, no guardamos: el front muestra la alerta.
+    const sistemaTotal = parseFloat(t.monto_total) || 0;
+    const diferencia = decTotal - sistemaTotal;
+    if (Math.abs(diferencia) >= 0.01 && !req.body.confirmar_diferencia) {
+      return res.status(409).json({
+        error: 'difference',
+        diferencia,
+        declarado_total: decTotal,
+      });
+    }
+
     const result = await pool.query(
       `INSERT INTO cash_closings
         (local_id, user_id, fecha, total_ventas, monto_efectivo, monto_debito, monto_credito, monto_transferencia, monto_total,

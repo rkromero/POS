@@ -88,7 +88,7 @@ async function getFullSale(saleId, db = pool) {
     [saleId]
   );
   const saleItems = await db.query(
-    `SELECT si.*, p.nombre as producto_nombre FROM sale_items si JOIN products p ON p.id=si.product_id WHERE si.sale_id=$1`,
+    `SELECT si.*, p.nombre as producto_nombre, p.unidad_medida FROM sale_items si JOIN products p ON p.id=si.product_id WHERE si.sale_id=$1`,
     [saleId]
   );
   return { ...fullSale.rows[0], items: saleItems.rows };

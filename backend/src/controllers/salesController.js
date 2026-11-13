@@ -44,7 +44,7 @@ async function getById(req, res, next) {
       return res.status(403).json({ error: 'No autorizado' });
     }
     const items = await pool.query(
-      `SELECT si.*, p.nombre as producto_nombre
+      `SELECT si.*, p.nombre as producto_nombre, p.unidad_medida
        FROM sale_items si JOIN products p ON p.id=si.product_id WHERE si.sale_id=$1`,
       [req.params.id]
     );

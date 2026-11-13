@@ -85,8 +85,8 @@ export default function Ticket({ sale, onClose }) {
               {(sale.items || []).map(item => (
                 <tr key={item.id} className="border-b border-gray-50">
                   <td className="py-1.5 pr-2 text-[#111111]">{item.producto_nombre}</td>
-                  <td className="py-1.5 text-right text-[#444444]">{item.cantidad}</td>
-                  <td className="py-1.5 text-right text-[#444444]">{formatMoney(item.precio_unitario)}</td>
+                  <td className="py-1.5 text-right text-[#444444]">{item.unidad_medida === 'kg' ? `${item.cantidad}g` : item.cantidad}</td>
+                  <td className="py-1.5 text-right text-[#444444]">{formatMoney(item.precio_unitario)}{item.unidad_medida === 'kg' ? '/kg' : ''}</td>
                   <td className="py-1.5 text-right font-medium">{formatMoney(item.subtotal)}</td>
                 </tr>
               ))}

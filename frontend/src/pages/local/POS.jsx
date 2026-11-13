@@ -317,7 +317,7 @@ export default function POS() {
         items: saleCart.items.map(i => ({ product_id: i.product_id, cantidad: i.es_peso ? i.gramos : i.cantidad })),
       })
       setTicket(res.data)
-      removeCart(saleCart.id)
+      closeCart(saleCart.id)
       toast.success('¡Venta registrada!')
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error al registrar venta')

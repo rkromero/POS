@@ -1,3 +1,5 @@
+import { printThermal, escapeHtml } from '../utils/printThermal'
+
 const PAYMENT_LABELS = {
   efectivo: 'Efectivo',
   debito: 'Tarjeta de débito',
@@ -12,68 +14,38 @@ export default function Ticket({ sale, onClose }) {
   const num = String(sale.numero_comprobante).padStart(6, '0')
 
   const handlePrint = () => {
-    const w = window.open('', '_blank', 'width=420,height=720')
-    w.document.write(`
-      <!DOCTYPE html><html lang="es"><head>
-      <meta charset="UTF-8"/>
-      <title>Comprobante #${num}</title>
-      <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family: Arial, sans-serif; font-size: 13px; padding: 24px; max-width: 380px; }
-        .center { text-align: center; }
-        .logo { max-height: 56px; margin-bottom: 8px; }
-        .title { font-size: 17px; font-weight: bold; margin-bottom: 2px; }
-        .sub { color: #666; font-size: 12px; }
-        .divider { border: none; border-top: 1px dashed #ccc; margin: 12px 0; }
-        table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-        th { text-align: left; font-size: 11px; color: #666; padding: 3px 2px; border-bottom: 1px solid #eee; }
-        td { padding: 4px 2px; font-size: 12px; vertical-align: top; }
-        .right { text-align: right; }
-        .total-label { font-size: 12px; color: #666; }
-        .total-amount { font-size: 22px; font-weight: bold; color: #E91E8C; }
-        .footer { text-align: center; color: #999; font-size: 11px; margin-top: 16px; }
-      </style>
-      </head><body>
+    const e = escapeHtml
+    const items = (sale.items || []).map(i => {
+      const esKg = i.unidad_medida === 'kg'
+      const cant = esKg ? `${i.cantidad}g` : `${i.cantidad}`
+      const punit = esKg ? `${formatMoney(i.precio_unitario)}/kg` : formatMoney(i.precio_unitario)
+      return `
+        <div class="item">
+          <div class="item-name">${e(i.producto_nombre)}</div>
+          <div class="row"><span>${e(cant)} x ${e(punit)}</span><span>${e(formatMoney(i.subtotal))}</span></div>
+        </div>`
+    }).join('')
+
+    const body = `
       <div class="center">
-        ${sale.local_logo ? `<img src="${sale.local_logo}" class="logo" alt="Logo" />` : ''}
-        <div class="title">${sale.local_nombre}</div>
-        <div class="sub">Comprobante #${num}</div>
-        <div class="sub">${formatDate(sale.created_at)}</div>
+        ${sale.local_logo ? `<img src="${e(sale.local_logo)}" class="logo" alt="" onerror="this.style.display='none'" />` : ''}
+        <div class="title">${e(sale.local_nombre)}</div>
+        <div>Comprobante #${e(num)}</div>
+        <div>${e(formatDate(sale.created_at))}</div>
       </div>
-      <hr class="divider" />
-      <div><strong>Cliente:</strong> ${sale.cliente_nombre}</div>
-      ${sale.cliente_email ? `<div style="color:#666;font-size:12px">${sale.cliente_email}</div>` : ''}
-      ${sale.cliente_whatsapp ? `<div style="color:#666;font-size:12px">WhatsApp: ${sale.cliente_whatsapp}</div>` : ''}
-      <hr class="divider" />
-      <table>
-        <thead><tr>
-          <th>Producto</th><th class="right">Cant.</th><th class="right">P.Unit.</th><th class="right">Subtotal</th>
-        </tr></thead>
-        <tbody>
-          ${(sale.items || []).map(i => `
-            <tr>
-              <td>${i.producto_nombre}</td>
-              <td class="right">${i.cantidad}</td>
-              <td class="right">${formatMoney(i.precio_unitario)}</td>
-              <td class="right">${formatMoney(i.subtotal)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-      <hr class="divider" />
-      <div style="display:flex;justify-content:space-between;align-items:flex-end">
-        <div class="sub">Método: ${PAYMENT_LABELS[sale.metodo_pago] || sale.metodo_pago}</div>
-        <div style="text-align:right">
-          <div class="total-label">TOTAL</div>
-          <div class="total-amount">${formatMoney(sale.total)}</div>
-        </div>
-      </div>
+      <hr class="sep" />
+      <div class="wrap"><span class="bold">Cliente:</span> ${e(sale.cliente_nombre)}</div>
+      ${sale.cliente_email ? `<div class="wrap">${e(sale.cliente_email)}</div>` : ''}
+      ${sale.cliente_whatsapp ? `<div class="wrap">WhatsApp: ${e(sale.cliente_whatsapp)}</div>` : ''}
+      <hr class="sep" />
+      ${items}
+      <hr class="sep" />
+      <div>Método: ${e(PAYMENT_LABELS[sale.metodo_pago] || sale.metodo_pago)}</div>
+      <div class="row total"><span>TOTAL</span><span>${e(formatMoney(sale.total))}</span></div>
+      <hr class="sep" />
       <p class="footer">¡Gracias por su compra!</p>
-      </body></html>
-    `)
-    w.document.close()
-    w.focus()
-    setTimeout(() => { w.print(); w.close() }, 300)
+    `
+    printThermal(body, { title: `Comprobante #${num}` }).catch(() => {})
   }
 
   return (

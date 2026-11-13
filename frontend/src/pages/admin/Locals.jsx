@@ -274,6 +274,7 @@ export default function AdminLocals() {
                   <label className="block text-sm font-medium mb-1">Rol *</label>
                   <select className="input-field" value={userForm.role} onChange={e => setU('role', e.target.value)}>
                     <option value="local">Usuario de Local</option>
+                    <option value="cajero">Cajero</option>
                     <option value="admin">Administrador</option>
                   </select>
                 </div>

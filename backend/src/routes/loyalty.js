@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, requireRole } = require('../middleware/auth');
 const ctrl = require('../controllers/loyaltyController');
 
-router.use(authenticateToken);
+router.use(authenticateToken, requireRole('admin', 'local'));
 
 // Config (admin only)
 router.get('/config', ctrl.getConfig);

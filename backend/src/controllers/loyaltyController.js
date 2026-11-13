@@ -280,7 +280,7 @@ async function entregarCanje(req, res, next) {
       return res.status(400).json({ error: 'Este canje ya fue entregado' });
     }
 
-    const localId = req.user.role === 'local' ? req.user.local_id : (req.body.local_id || null);
+    const localId = req.user.role === 'admin' ? (req.body.local_id || null) : req.user.local_id;
 
     // El WHERE ... entregado_at IS NULL evita una doble entrega por carrera
     const upd = await pool.query(

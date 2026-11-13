@@ -1,6 +1,13 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
+// Pantalla de inicio de cada rol
+export const homeForRole = (role) => {
+  if (role === 'admin') return '/admin'
+  if (role === 'cajero') return '/cajero'
+  return '/local'
+}
+
 export default function PrivateRoute({ children, role }) {
   const { user, loading } = useAuth()
 
@@ -13,8 +20,7 @@ export default function PrivateRoute({ children, role }) {
   }
 
   if (!user) return <Navigate to="/login" replace />
-  if (role === 'admin' && user.role !== 'admin') return <Navigate to="/local" replace />
-  if (role === 'local' && user.role === 'admin') return <Navigate to="/admin" replace />
+  if (role && user.role !== role) return <Navigate to={homeForRole(user.role)} replace />
 
   return children
 }

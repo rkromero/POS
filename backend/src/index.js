@@ -19,6 +19,7 @@ const publicLoyaltyRoutes = require('./routes/publicLoyalty');
 const wholesaleClientRoutes = require('./routes/wholesaleClients');
 const wholesaleOrderRoutes = require('./routes/wholesaleOrders');
 const wholesalePaymentRoutes = require('./routes/wholesalePayments');
+const cashierOrderRoutes = require('./routes/cashierOrders');
 
 const pool = require('./db/pool');
 
@@ -210,6 +211,63 @@ async function runMigrations() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    // Rol 'cajero': reemplaza el CHECK de users.role solo si todavía no incluye 'cajero'
+    await client.query(`
+      DO $$
+      DECLARE c RECORD;
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conrelid = 'users'::regclass AND contype = 'c'
+            AND conname = 'users_role_check'
+            AND pg_get_constraintdef(oid) LIKE '%cajero%'
+        ) THEN
+          FOR c IN
+            SELECT conname FROM pg_constraint
+            WHERE conrelid = 'users'::regclass AND contype = 'c'
+              AND pg_get_constraintdef(oid) LIKE '%role%'
+          LOOP
+            EXECUTE format('ALTER TABLE users DROP CONSTRAINT %I', c.conname);
+          END LOOP;
+          ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','local','cajero'));
+        END IF;
+      END $$
+    `);
+    // Pedidos enviados a caja desde el POS (se cobran en la pantalla del cajero)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cashier_orders (
+        id SERIAL PRIMARY KEY,
+        local_id INTEGER NOT NULL REFERENCES locals(id),
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        nombre_carrito VARCHAR(100),
+        cliente_nombre VARCHAR(100),
+        cliente_email VARCHAR(150),
+        cliente_whatsapp VARCHAR(30),
+        total_estimado NUMERIC(10,2) NOT NULL DEFAULT 0,
+        estado VARCHAR(20) NOT NULL DEFAULT 'por_cobrar'
+          CHECK (estado IN ('por_cobrar','cobrado','cancelado')),
+        cobrado_por INTEGER REFERENCES users(id),
+        cobrado_at TIMESTAMPTZ,
+        sale_id INTEGER REFERENCES sales(id),
+        cancelado_por INTEGER REFERENCES users(id),
+        cancelado_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`ALTER TABLE cashier_orders ADD COLUMN IF NOT EXISTS cancelado_por INTEGER REFERENCES users(id)`);
+    await client.query(`ALTER TABLE cashier_orders ADD COLUMN IF NOT EXISTS cancelado_at TIMESTAMPTZ`);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cashier_order_items (
+        id SERIAL PRIMARY KEY,
+        order_id INTEGER NOT NULL REFERENCES cashier_orders(id) ON DELETE CASCADE,
+        product_id INTEGER NOT NULL REFERENCES products(id),
+        cantidad INTEGER NOT NULL CHECK (cantidad > 0),
+        precio_unitario NUMERIC(10,2) NOT NULL,
+        subtotal NUMERIC(10,2) NOT NULL
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_cashier_orders_local_estado ON cashier_orders (local_id, estado)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_cashier_order_items_order ON cashier_order_items (order_id)`);
     console.log('✅ Tablas de mayoristas verificadas/creadas');
   } catch (err) {
     console.error('⚠️ Error en migración automática:', err.message);
@@ -253,6 +311,7 @@ app.use('/api/loyalty', loyaltyRoutes);
 app.use('/api/wholesale-clients', wholesaleClientRoutes);
 app.use('/api/wholesale-orders', wholesaleOrderRoutes);
 app.use('/api/wholesale-payments', wholesalePaymentRoutes);
+app.use('/api/pedidos-caja', cashierOrderRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'Mimí POS' }));
 

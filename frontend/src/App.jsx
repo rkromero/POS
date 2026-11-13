@@ -18,12 +18,15 @@ import CierreCaja from './pages/local/CierreCaja'
 import Gastos from './pages/local/Gastos'
 import MermaProductos from './pages/local/MermaProductos'
 import Canjes from './pages/local/Canjes'
+import CajeroLayout from './pages/cajero/CajeroLayout'
+import ACobrar from './pages/cajero/ACobrar'
 import AdminFactoryOrders from './pages/admin/FactoryOrders'
 import WholesaleClients from './pages/admin/WholesaleClients'
 import WholesaleOrders from './pages/admin/WholesaleOrders'
 import Fidelizacion from './pages/admin/Fidelizacion'
 import MisPuntos from './pages/MisPuntos'
 import AdminCierresCaja from './pages/admin/CierresCaja'
+import AdminPedidosPorCobrar from './pages/admin/PedidosPorCobrar'
 
 export default function App() {
   return (
@@ -41,6 +44,7 @@ export default function App() {
           <Route path="mayoristas/nuevo-pedido" element={<WholesaleOrders />} />
           <Route path="fidelizacion" element={<Fidelizacion />} />
           <Route path="cierres-caja" element={<AdminCierresCaja />} />
+          <Route path="pedidos-por-cobrar" element={<AdminPedidosPorCobrar />} />
         </Route>
         <Route path="/local" element={<PrivateRoute role="local"><LocalLayout /></PrivateRoute>}>
           <Route index element={<POS />} />
@@ -52,6 +56,10 @@ export default function App() {
           <Route path="merma" element={<MermaProductos />} />
           <Route path="pedido-fabrica" element={<PedidoFabrica />} />
           <Route path="canjes" element={<Canjes />} />
+        </Route>
+        <Route path="/cajero" element={<PrivateRoute role="cajero"><CajeroLayout /></PrivateRoute>}>
+          <Route index element={<ACobrar />} />
+          <Route path="cierre-caja" element={<CierreCaja />} />
         </Route>
         <Route path="/mis-puntos" element={<MisPuntos />} />
         <Route path="*" element={<Navigate to="/login" replace />} />

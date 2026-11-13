@@ -6,7 +6,7 @@ async function getAll(req, res, next) {
     const params = [];
     const conditions = [];
 
-    if (req.user.role === 'local') {
+    if (req.user.role !== 'admin') {
       params.push(req.user.local_id);
       conditions.push(`fo.local_id = $${params.length}`);
     }
@@ -45,7 +45,7 @@ async function getById(req, res, next) {
       [req.params.id]
     );
     if (!order.rows[0]) return res.status(404).json({ error: 'Pedido no encontrado' });
-    if (req.user.role === 'local' && order.rows[0].local_id !== req.user.local_id) {
+    if (req.user.role !== 'admin' && order.rows[0].local_id !== req.user.local_id) {
       return res.status(403).json({ error: 'No autorizado' });
     }
     const items = await pool.query(
@@ -149,7 +149,7 @@ async function receive(req, res, next) {
     if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
 
     // Sólo el local dueño del pedido (o un admin) puede recepcionar
-    if (req.user.role === 'local' && order.local_id !== req.user.local_id) {
+    if (req.user.role !== 'admin' && order.local_id !== req.user.local_id) {
       return res.status(403).json({ error: 'No autorizado' });
     }
 

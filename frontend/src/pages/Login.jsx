@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { homeForRole } from '../components/PrivateRoute'
 import toast from 'react-hot-toast'
 
 export default function Login() {
@@ -16,7 +17,7 @@ export default function Login() {
     try {
       const user = await login(email, password)
       toast.success(`¡Bienvenido/a, ${user.nombre}!`)
-      navigate(user.role === 'admin' ? '/admin' : '/local')
+      navigate(homeForRole(user.role))
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error al iniciar sesión')
     } finally {

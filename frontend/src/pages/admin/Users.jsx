@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
+const ROLE_BADGES = {
+  admin: { label: 'Admin', className: 'bg-purple-100 text-purple-700' },
+  local: { label: 'Local', className: 'bg-mimi-50 text-mimi-500' },
+  cajero: { label: 'Cajero', className: 'bg-blue-100 text-blue-700' },
+}
+
 const EMPTY = { nombre: '', email: '', password: '', role: 'local', local_id: '', activo: true }
 
 export default function AdminUsers() {
@@ -77,8 +83,8 @@ export default function AdminUsers() {
                 <td className="py-3 px-4 font-medium">{u.nombre}</td>
                 <td className="py-3 px-4 text-[#444444]">{u.email}</td>
                 <td className="py-3 px-4">
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-mimi-50 text-mimi-500'}`}>
-                    {u.role === 'admin' ? 'Admin' : 'Local'}
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${(ROLE_BADGES[u.role] || ROLE_BADGES.local).className}`}>
+                    {(ROLE_BADGES[u.role] || { label: u.role }).label}
                   </span>
                 </td>
                 <td className="py-3 px-4 text-[#444444]">{u.local_nombre || '—'}</td>
@@ -130,10 +136,11 @@ export default function AdminUsers() {
                 <label className="block text-sm font-medium mb-1">Rol *</label>
                 <select className="input-field" value={form.role} onChange={e => set('role', e.target.value)}>
                   <option value="local">Usuario de Local</option>
+                  <option value="cajero">Cajero</option>
                   <option value="admin">Administrador</option>
                 </select>
               </div>
-              {form.role === 'local' && (
+              {(form.role === 'local' || form.role === 'cajero') && (
                 <div>
                   <label className="block text-sm font-medium mb-1">Local *</label>
                   <select className="input-field" value={form.local_id} onChange={e => set('local_id', e.target.value)} required>

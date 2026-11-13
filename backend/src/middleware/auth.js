@@ -20,4 +20,14 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { authenticateToken, requireAdmin };
+// Permite el acceso solo a los roles indicados: requireRole('admin', 'local')
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!roles.includes(req.user?.role)) {
+      return res.status(403).json({ error: 'No tenés permisos para esta acción' });
+    }
+    next();
+  };
+}
+
+module.exports = { authenticateToken, requireAdmin, requireRole };

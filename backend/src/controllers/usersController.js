@@ -1,6 +1,10 @@
 const bcrypt = require('bcrypt');
 const pool = require('../db/pool');
 
+const ROLES = ['admin', 'local', 'cajero'];
+// Roles que operan en un local y por lo tanto requieren local_id
+const ROLES_CON_LOCAL = ['local', 'cajero'];
+
 async function getAll(req, res, next) {
   try {
     const { page = 1, limit = 20, local_id } = req.query;
@@ -45,8 +49,11 @@ async function create(req, res, next) {
     if (!nombre || !email || !password || !role) {
       return res.status(400).json({ error: 'nombre, email, password y role son requeridos' });
     }
-    if (role === 'local' && !local_id) {
-      return res.status(400).json({ error: 'local_id es requerido para usuarios de tipo local' });
+    if (!ROLES.includes(role)) {
+      return res.status(400).json({ error: 'Rol inválido' });
+    }
+    if (ROLES_CON_LOCAL.includes(role) && !local_id) {
+      return res.status(400).json({ error: `local_id es requerido para usuarios de tipo ${role}` });
     }
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
@@ -63,6 +70,15 @@ async function create(req, res, next) {
 async function update(req, res, next) {
   try {
     const { nombre, email, password, role, local_id, activo } = req.body;
+    if (role && !ROLES.includes(role)) {
+      return res.status(400).json({ error: 'Rol inválido' });
+    }
+    if (role && ROLES_CON_LOCAL.includes(role) && !local_id) {
+      const current = await pool.query('SELECT local_id FROM users WHERE id = $1', [req.params.id]);
+      if (current.rows[0] && !current.rows[0].local_id) {
+        return res.status(400).json({ error: `local_id es requerido para usuarios de tipo ${role}` });
+      }
+    }
     const hash = password ? await bcrypt.hash(password, 10) : null;
     const result = await pool.query(
       `UPDATE users SET

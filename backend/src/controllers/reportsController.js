@@ -14,7 +14,7 @@ async function salesByLocal(req, res, next) {
 async function salesByPeriod(req, res, next) {
   try {
     const { desde, hasta, local_id, period = 'day' } = req.query;
-    const effectiveLocalId = req.user.role === 'local' ? req.user.local_id : local_id;
+    const effectiveLocalId = req.user.role === 'admin' ? local_id : req.user.local_id;
     const params = [];
     const conditions = [];
 
@@ -40,7 +40,7 @@ async function salesByPeriod(req, res, next) {
 async function topProducts(req, res, next) {
   try {
     const { local_id, limit = 10, desde, hasta, unidad_medida } = req.query;
-    const effectiveLocalId = req.user.role === 'local' ? req.user.local_id : local_id;
+    const effectiveLocalId = req.user.role === 'admin' ? local_id : req.user.local_id;
     const params = [];
     const conditions = [];
 

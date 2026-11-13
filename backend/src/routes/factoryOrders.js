@@ -1,8 +1,8 @@
 const router = require('express').Router();
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 const c = require('../controllers/factoryOrdersController');
 
-router.use(authenticateToken);
+router.use(authenticateToken, requireRole('admin', 'local'));
 router.get('/', c.getAll);
 router.get('/:id', c.getById);
 router.post('/', c.create);

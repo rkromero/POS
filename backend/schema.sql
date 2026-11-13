@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
   nombre VARCHAR(100) NOT NULL,
   email VARCHAR(150) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  role VARCHAR(10) NOT NULL CHECK (role IN ('admin', 'local')),
+  role VARCHAR(10) NOT NULL CONSTRAINT users_role_check CHECK (role IN ('admin', 'local', 'cajero')),
   local_id INTEGER REFERENCES locals(id) ON DELETE SET NULL,
   activo BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW()

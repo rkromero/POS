@@ -11,6 +11,7 @@ const adminLinks = [
   { to: '/admin/mayoristas', icon: '🏬', label: 'Mayoristas' },
   { to: '/admin/fidelizacion', icon: '⭐', label: 'Fidelización' },
   { to: '/admin/cierres-caja', icon: '💰', label: 'Cierres de Caja' },
+  { to: '/admin/pedidos-por-cobrar', icon: '🧾', label: 'Pedidos por cobrar' },
 ]
 
 export default function AdminLayout() {

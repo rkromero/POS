@@ -1,8 +1,8 @@
 const router = require('express').Router();
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, requireRole } = require('../middleware/auth');
 const c = require('../controllers/reportsController');
 
-router.use(authenticateToken);
+router.use(authenticateToken, requireRole('admin', 'local'));
 router.get('/by-local', requireAdmin, c.salesByLocal);
 router.get('/by-period', c.salesByPeriod);
 router.get('/top-products', c.topProducts);

@@ -69,6 +69,8 @@ export default function POS() {
   const [lookupLoading, setLookupLoading] = useState(false)
   const [weightPopup, setWeightPopup] = useState(null)
   const [gramosInput, setGramosInput] = useState('')
+  // Si el local tiene cajero, el POS no cobra: envía el pedido a caja
+  const [tieneCajero, setTieneCajero] = useState(false)
 
   // Carrito activo (siempre existe al menos uno)
   const activeCart = carts.find(c => c.id === activeCartId) || carts[0]
@@ -87,7 +89,15 @@ export default function POS() {
       } catch { toast.error('Error al cargar productos') }
     }
     load()
+    loadCajeroConfig()
   }, [])
+
+  async function loadCajeroConfig() {
+    try {
+      const res = await api.get('/pedidos-caja/config')
+      setTieneCajero(!!res.data.tiene_cajero)
+    } catch { /* si falla, el POS sigue cobrando como siempre */ }
+  }
 
   // Persistir carritos en localStorage
   useEffect(() => {
@@ -158,6 +168,11 @@ export default function POS() {
   const removeCart = (id) => {
     const c = carts.find(x => x.id === id)
     if (c && c.items.length > 0 && !window.confirm(`¿Cerrar "${c.nombre}"? Se perderán sus productos.`)) return
+    closeCart(id)
+  }
+
+  // Cierra el carrito sin pedir confirmación
+  const closeCart = (id) => {
     // Si cerramos el carrito activo, cambiamos antes a otro para evitar parpadeos
     if (id === activeCart.id) {
       const remaining = carts.filter(x => x.id !== id)
@@ -260,7 +275,31 @@ export default function POS() {
     setShowModal(true)
   }
 
+  const submitPedido = async (cliente) => {
+    const pedidoCart = activeCart
+    setShowModal(false)
+    setLoading(true)
+    try {
+      await api.post('/pedidos-caja', {
+        nombre_carrito: pedidoCart.nombre,
+        cliente_nombre: cliente.nombre,
+        cliente_email: cliente.email || null,
+        cliente_whatsapp: cliente.whatsapp || null,
+        items: pedidoCart.items.map(i => ({ product_id: i.product_id, cantidad: i.es_peso ? i.gramos : i.cantidad })),
+      })
+      closeCart(pedidoCart.id)
+      toast.success(`"${pedidoCart.nombre}" enviado a caja`)
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al enviar el pedido a caja')
+      // Si el local ya no tiene cajero, volvemos al modo de cobro normal
+      if (err.response?.status === 400) loadCajeroConfig()
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const submitSale = async (cliente) => {
+    if (tieneCajero) return submitPedido(cliente)
     const saleCart = activeCart
     setShowModal(false)
     setLoading(true)
@@ -277,6 +316,8 @@ export default function POS() {
       toast.success('¡Venta registrada!')
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error al registrar venta')
+      // Se asignó un cajero al local: pasamos a modo "Enviar a caja"
+      if (err.response?.status === 403) loadCajeroConfig()
     } finally {
       setLoading(false)
     }
@@ -467,18 +508,26 @@ export default function POS() {
             </div>
           )}
 
-          {/* Pago */}
-          <div className="px-3 pb-3 border-t border-[#E5E7EB] pt-3">
-            <p className="text-xs font-semibold text-[#444444] uppercase tracking-wide mb-1.5">Método de pago</p>
-            <select className="input-field text-xs py-1.5" value={metodoPago} onChange={e => setMetodoPago(e.target.value)}>
-              {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
-          </div>
+          {/* Pago (con cajero, el medio de pago lo elige el cajero al cobrar) */}
+          {!tieneCajero && (
+            <div className="px-3 pb-3 border-t border-[#E5E7EB] pt-3">
+              <p className="text-xs font-semibold text-[#444444] uppercase tracking-wide mb-1.5">Método de pago</p>
+              <select className="input-field text-xs py-1.5" value={metodoPago} onChange={e => setMetodoPago(e.target.value)}>
+                {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </div>
+          )}
 
-          <div className="px-3 pb-4">
-            <button onClick={openModal} disabled={loading || cart.length === 0} className="btn-primary w-full py-3 text-base">
-              {loading ? 'Registrando...' : '✓ Confirmar venta'}
-            </button>
+          <div className={`px-3 pb-4 ${tieneCajero ? 'border-t border-[#E5E7EB] pt-3' : ''}`}>
+            {tieneCajero ? (
+              <button onClick={openModal} disabled={loading || cart.length === 0} className="btn-primary w-full py-3 text-base">
+                {loading ? 'Enviando...' : '→ Enviar a caja'}
+              </button>
+            ) : (
+              <button onClick={openModal} disabled={loading || cart.length === 0} className="btn-primary w-full py-3 text-base">
+                {loading ? 'Registrando...' : '✓ Confirmar venta'}
+              </button>
+            )}
           </div>
         </div>
       </div>

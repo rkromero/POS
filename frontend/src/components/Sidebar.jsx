@@ -7,7 +7,7 @@ function NavItem({ to, icon, label, onNavigate }) {
   return (
     <NavLink
       to={to}
-      end={to === '/admin' || to === '/local'}
+      end={to === '/admin' || to === '/local' || to === '/cajero'}
       onClick={onNavigate}
       className={({ isActive }) =>
         `flex items-center gap-3 px-4 py-2.5 rounded-xl mx-2 text-sm font-medium transition-colors ${

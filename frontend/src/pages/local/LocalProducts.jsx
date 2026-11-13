@@ -54,7 +54,7 @@ export default function LocalProducts() {
         </select>
       </div>
 
-      <div className="card p-0 overflow-hidden">
+      <div className="card p-0 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-mimi-50">

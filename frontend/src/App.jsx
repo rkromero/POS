@@ -59,6 +59,7 @@ export default function App() {
         </Route>
         <Route path="/cajero" element={<PrivateRoute role="cajero"><CajeroLayout /></PrivateRoute>}>
           <Route index element={<ACobrar />} />
+          <Route path="pos" element={<POS />} />
           <Route path="cierre-caja" element={<CierreCaja />} />
         </Route>
         <Route path="/mis-puntos" element={<MisPuntos />} />

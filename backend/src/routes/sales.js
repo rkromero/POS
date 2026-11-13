@@ -5,7 +5,7 @@ const c = require('../controllers/salesController');
 router.use(authenticateToken);
 router.get('/', c.getAll);
 router.get('/:id', c.getById);
-// El cajero no hace ventas directas: cobra pedidos vía /api/pedidos-caja
-router.post('/', requireRole('admin', 'local'), c.create);
+// El cajero también vende directo desde el POS (la venta queda a su nombre y entra en su cierre)
+router.post('/', requireRole('admin', 'local', 'cajero'), c.create);
 
 module.exports = router;

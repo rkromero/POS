@@ -3,7 +3,13 @@ const router = express.Router();
 const { authenticateToken, requireAdmin, requireRole } = require('../middleware/auth');
 const ctrl = require('../controllers/loyaltyController');
 
-router.use(authenticateToken, requireRole('admin', 'local'));
+router.use(authenticateToken);
+
+// Búsqueda rápida de cliente: la usa el POS (local y cajero)
+router.get('/search', requireRole('admin', 'local', 'cajero'), ctrl.searchCliente);
+
+// El resto de fidelización: sólo admin y local
+router.use(requireRole('admin', 'local'));
 
 // Config (admin only)
 router.get('/config', ctrl.getConfig);
@@ -33,9 +39,6 @@ router.post('/canje', ctrl.canjear);
 // Canjes: listado y entrega (todos los locales, cualquier usuario autenticado)
 router.get('/canjes', ctrl.getCanjes);
 router.patch('/canjes/:id/entregar', ctrl.entregarCanje);
-
-// Búsqueda rápida
-router.get('/search', ctrl.searchCliente);
 
 // Dashboard
 router.get('/dashboard', requireAdmin, ctrl.getDashboard);

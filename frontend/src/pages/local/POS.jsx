@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import Ticket from '../../components/Ticket'
+import { useAuth } from '../../context/AuthContext'
 
 const PAYMENT_METHODS = [
   { value: 'efectivo', label: 'Efectivo' },
@@ -71,6 +72,10 @@ export default function POS() {
   const [gramosInput, setGramosInput] = useState('')
   // Si el local tiene cajero, el POS no cobra: envía el pedido a caja
   const [tieneCajero, setTieneCajero] = useState(false)
+  const { user } = useAuth()
+  // El cajero usa el mismo POS pero cobra directo (venta a su nombre, entra en su cierre de caja)
+  const esCajero = user?.role === 'cajero'
+  const enviaACaja = tieneCajero && !esCajero
 
   // Carrito activo (siempre existe al menos uno)
   const activeCart = carts.find(c => c.id === activeCartId) || carts[0]
@@ -299,7 +304,7 @@ export default function POS() {
   }
 
   const submitSale = async (cliente) => {
-    if (tieneCajero) return submitPedido(cliente)
+    if (enviaACaja) return submitPedido(cliente)
     const saleCart = activeCart
     setShowModal(false)
     setLoading(true)
@@ -338,238 +343,308 @@ export default function POS() {
     submitSale({ nombre: 'Invitado', email: null, whatsapp: null })
   }
 
+  // Layout tablet: horizontal → grilla + carrito al costado; vertical → grilla arriba + carrito abajo
   return (
-    <div className="flex gap-4 h-[calc(100vh-3rem)]">
+    <div className="h-full flex flex-col landscape:flex-row gap-2 lg:gap-3 touch-manipulation">
       {/* Panel productos */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold text-[#111111]">Caja</h1>
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-2">
+        <h1 className="sr-only">Caja</h1>
+
+        {/* Búsqueda (deja lugar al botón de menú fijo a la izquierda) */}
+        <div className={`flex items-center gap-2 flex-shrink-0 ${esCajero ? '' : 'pl-[3.25rem]'}`}>
+          <div className="relative flex-1 min-w-0">
+            <input
+              className="input-field h-12 text-base pr-12"
+              placeholder="Buscar producto..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              enterKeyHint="search"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-0 top-0 h-12 w-12 flex items-center justify-center rounded-xl text-[#444444] active:bg-gray-100"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex gap-2 mb-4">
-          <input
-            className="input-field flex-1 text-sm"
-            placeholder="Buscar producto por nombre..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <select className="input-field w-44 text-sm" value={catFilter} onChange={e => setCatFilter(e.target.value)}>
-            <option value="">Todas las categorías</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-          </select>
+        {/* Categorías */}
+        <div className="flex gap-2 overflow-x-auto pb-1 flex-shrink-0">
+          {[{ id: '', nombre: 'Todas' }, ...categories].map(c => {
+            const isActive = String(catFilter) === String(c.id)
+            return (
+              <button
+                key={c.id || 'all'}
+                onClick={() => setCatFilter(c.id === '' ? '' : String(c.id))}
+                className={`h-11 px-4 rounded-full text-sm font-semibold whitespace-nowrap flex-shrink-0 border transition-colors ${
+                  isActive
+                    ? 'bg-mimi-500 border-mimi-500 text-white'
+                    : 'bg-white border-[#E5E7EB] text-[#444444] active:bg-mimi-50'
+                }`}
+              >
+                {c.nombre}
+              </button>
+            )
+          })}
         </div>
 
-        <div className="flex-1 overflow-auto">
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+        {/* Grilla de productos */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          <div className="grid gap-2 sm:gap-3 grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))]">
             {filtered.map(p => (
               <button
                 key={p.id}
                 onClick={() => addToCart(p)}
                 disabled={p.stock === 0}
-                className="card text-left hover:border-mimi-500 hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed p-4 active:scale-95"
+                className="bg-white border border-[#E5E7EB] rounded-2xl shadow-sm text-left p-3 min-h-[7rem] flex flex-col select-none hover:border-mimi-500 hover:shadow-md active:scale-95 active:border-mimi-500 active:bg-mimi-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {p.categoria_nombre && (
-                  <span className="inline-block text-xs bg-mimi-50 text-mimi-500 px-2 py-0.5 rounded-full font-medium mb-2">
+                  <span className="self-start max-w-full truncate text-xs bg-mimi-50 text-mimi-500 px-2 py-0.5 rounded-full font-medium mb-1.5">
                     {p.categoria_nombre}
                   </span>
                 )}
-                <p className="font-semibold text-[#111111] text-sm leading-snug">{p.nombre}</p>
-                <p className="text-mimi-500 font-bold text-base mt-1">
-                  {fmt(p.precio)}{p.unidad_medida === 'kg' && <span className="text-xs font-normal text-[#444444] ml-1">/kg</span>}
-                </p>
-                {p.unidad_medida === 'kg'
-                  ? <p className="text-xs text-orange-500 mt-1 font-medium">Por peso</p>
-                  : <p className="text-xs text-[#444444] mt-1">Stock: {p.stock}</p>
-                }
+                <p className="font-semibold text-[#111111] text-base leading-snug line-clamp-2">{p.nombre}</p>
+                <div className="mt-auto pt-1.5">
+                  <p className="text-mimi-500 font-bold text-lg leading-tight">
+                    {fmt(p.precio)}{p.unidad_medida === 'kg' && <span className="text-xs font-normal text-[#444444] ml-1">/kg</span>}
+                  </p>
+                  {p.unidad_medida === 'kg'
+                    ? <p className="text-xs text-orange-500 font-medium">Por peso</p>
+                    : <p className="text-xs text-[#444444]">Stock: {p.stock}</p>
+                  }
+                </div>
               </button>
             ))}
             {filtered.length === 0 && (
-              <p className="col-span-4 text-center text-[#444444] py-12">No se encontraron productos</p>
+              <p className="col-span-full text-center text-[#444444] py-12">No se encontraron productos</p>
             )}
           </div>
         </div>
       </div>
 
       {/* Panel carrito */}
-      <div className="w-72 flex-shrink-0 flex flex-col gap-2 min-h-0">
-        {/* Pestañas de carritos */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 flex-shrink-0">
-          {carts.map(c => {
-            const isActive = c.id === activeCart.id
-            const count = cartCount(c)
-            return (
-              <div
-                key={c.id}
-                className={`group flex items-center gap-1 pl-2.5 pr-1 py-1.5 rounded-xl flex-shrink-0 border transition-colors ${
-                  isActive ? 'bg-mimi-500 border-mimi-500 text-white' : 'bg-white border-[#E5E7EB] text-[#444444] hover:border-mimi-300'
-                }`}
-              >
-                {editingCartId === c.id ? (
-                  <input
-                    autoFocus
-                    value={editingName}
-                    onChange={e => setEditingName(e.target.value)}
-                    onBlur={commitRename}
-                    onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') cancelRename() }}
-                    className="w-20 text-xs text-[#111111] rounded px-1 py-0.5 border border-mimi-300 outline-none"
-                  />
-                ) : (
-                  <span
-                    onClick={() => setActiveCartId(c.id)}
-                    onDoubleClick={() => startRename(c)}
-                    title="Doble click para renombrar"
-                    className="text-xs font-semibold whitespace-nowrap max-w-[90px] truncate cursor-pointer"
-                  >
-                    {c.nombre}
-                    {count > 0 && <span className={isActive ? 'text-white/80 ml-1' : 'text-mimi-500 ml-1'}>·{count}</span>}
-                  </span>
-                )}
-                {carts.length > 1 && (
-                  <button
-                    onClick={() => removeCart(c.id)}
-                    title="Cerrar carrito"
-                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 ${
-                      isActive ? 'hover:bg-white/25' : 'hover:bg-gray-100'
-                    }`}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            )
-          })}
+      <section className="flex-shrink-0 flex flex-col gap-2 min-h-0 portrait:h-[42%] landscape:w-[22rem] xl:landscape:w-96">
+        {/* Pestañas de carritos (el "+" queda fijo al final, fuera del scroll) */}
+        <div className="flex items-start gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-1 min-w-0">
+            {carts.map(c => {
+              const isActive = c.id === activeCart.id
+              const count = cartCount(c)
+              return (
+                <div
+                  key={c.id}
+                  className={`h-12 flex items-center rounded-xl flex-shrink-0 border transition-colors ${
+                    isActive ? 'bg-mimi-500 border-mimi-500 text-white' : 'bg-white border-[#E5E7EB] text-[#444444]'
+                  }`}
+                >
+                  {editingCartId === c.id ? (
+                    <input
+                      autoFocus
+                      value={editingName}
+                      onChange={e => setEditingName(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') cancelRename() }}
+                      enterKeyHint="done"
+                      className="w-36 h-10 mx-1 text-base text-[#111111] rounded-lg px-2 border border-mimi-100 outline-none"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setActiveCartId(c.id)}
+                      onDoubleClick={() => startRename(c)}
+                      title="Doble toque para renombrar"
+                      className="h-full pl-3 pr-2 text-sm font-semibold whitespace-nowrap max-w-[10rem] truncate"
+                    >
+                      {c.nombre}
+                      {count > 0 && <span className={isActive ? 'text-white/80 ml-1' : 'text-mimi-500 ml-1'}>·{count}</span>}
+                    </button>
+                  )}
+                  {isActive && editingCartId !== c.id && (
+                    <button
+                      onClick={() => startRename(c)}
+                      aria-label="Renombrar carrito"
+                      className="h-full w-9 flex items-center justify-center text-sm active:bg-white/25 rounded-lg"
+                    >
+                      ✎
+                    </button>
+                  )}
+                  {carts.length > 1 && (
+                    <button
+                      onClick={() => removeCart(c.id)}
+                      aria-label="Cerrar carrito"
+                      className={`h-full w-10 flex items-center justify-center text-sm flex-shrink-0 rounded-r-xl ${
+                        isActive ? 'active:bg-white/25' : 'active:bg-gray-100'
+                      }`}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
           <button
             onClick={addCart}
-            title="Nuevo carrito"
-            className="flex-shrink-0 w-8 h-8 rounded-xl border border-dashed border-mimi-300 text-mimi-500 font-bold hover:bg-mimi-50 flex items-center justify-center"
+            aria-label="Nuevo carrito"
+            className="flex-shrink-0 w-12 h-12 rounded-xl border-2 border-dashed border-mimi-100 text-mimi-500 text-2xl font-bold active:bg-mimi-50 flex items-center justify-center"
           >
             +
           </button>
         </div>
 
-        <div className="card flex flex-col flex-1 min-h-0 overflow-hidden p-0">
-          <div className="px-4 py-3 border-b border-[#E5E7EB]">
-            <div className="flex items-center justify-between gap-2">
+        <div className="bg-white border border-[#E5E7EB] rounded-2xl shadow-sm flex flex-col portrait:flex-row flex-1 min-h-0 overflow-hidden">
+          {/* Items */}
+          <div className="flex-1 min-h-0 min-w-0 flex flex-col">
+            <div className="px-3 h-12 border-b border-[#E5E7EB] flex items-center justify-between gap-2 flex-shrink-0">
               <h2 className="text-base font-bold text-[#111111] truncate">{activeCart.nombre}</h2>
               {cart.length > 0 && (
-                <button onClick={clearActiveCart} className="text-xs text-[#444444] hover:text-red-500 flex-shrink-0">Vaciar</button>
+                <button
+                  onClick={clearActiveCart}
+                  className="h-10 px-3 -mr-1 rounded-lg text-sm text-[#444444] active:bg-red-50 active:text-red-500 hover:text-red-500 flex-shrink-0"
+                >
+                  Vaciar
+                </button>
               )}
             </div>
-          </div>
 
-          {/* Items */}
-          <div className="flex-1 overflow-auto px-3 py-2 space-y-2">
-            {cart.length === 0 && (
-              <p className="text-sm text-[#444444] text-center py-8">El carrito está vacío</p>
-            )}
-            {cart.map(item => (
-              <div key={`${item.product_id}-${item.es_peso ? item.gramos : 'u'}`} className="flex items-center gap-2 border border-[#E5E7EB] rounded-xl p-2.5">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-[#111111] truncate leading-tight">{item.nombre}</p>
-                  {item.es_peso
-                    ? <p className="text-xs text-orange-500 font-medium mt-0.5">{item.gramos}g · {fmt(item.precio_unitario)}/kg</p>
-                    : <p className="text-xs text-mimi-500 font-medium mt-0.5">{fmt(item.precio_unitario)}</p>
-                  }
-                </div>
-                {item.es_peso ? (
-                  <button
-                    onClick={() => { setGramosInput(String(item.gramos)); setWeightPopup(products.find(p => p.id === item.product_id)) }}
-                    className="text-xs text-orange-500 hover:underline flex-shrink-0"
-                  >
-                    ✎
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button onClick={() => updateQty(item.product_id, -1)} className="w-5 h-5 rounded-lg bg-mimi-50 text-mimi-500 font-bold text-xs flex items-center justify-center hover:bg-mimi-100">−</button>
-                    <span className="w-5 text-center text-xs font-bold">{item.cantidad}</span>
-                    <button onClick={() => updateQty(item.product_id, 1)} className="w-5 h-5 rounded-lg bg-mimi-50 text-mimi-500 font-bold text-xs flex items-center justify-center hover:bg-mimi-100">+</button>
-                  </div>
-                )}
-                <button onClick={() => removeItem(item.product_id)} className="text-red-400 hover:text-red-600 text-xs ml-0.5">✕</button>
-              </div>
-            ))}
-          </div>
-
-          {/* Subtotales */}
-          {cart.length > 0 && (
-            <div className="px-3 pb-2 border-t border-[#E5E7EB] pt-2 space-y-0.5">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2 space-y-2">
+              {cart.length === 0 && (
+                <p className="text-sm text-[#444444] text-center py-8">El carrito está vacío</p>
+              )}
               {cart.map(item => (
-                <div key={`sub-${item.product_id}-${item.es_peso ? item.gramos : 'u'}`} className="flex justify-between text-xs text-[#444444]">
-                  <span className="truncate max-w-[130px]">
-                    {item.nombre} {item.es_peso ? `${item.gramos}g` : `×${item.cantidad}`}
-                  </span>
-                  <span className="font-medium">{fmt(itemTotal(item))}</span>
+                <div key={`${item.product_id}-${item.es_peso ? item.gramos : 'u'}`} className="border border-[#E5E7EB] rounded-xl p-2">
+                  <div className="flex items-start justify-between gap-2 px-1">
+                    <p className="text-sm font-semibold text-[#111111] leading-tight line-clamp-2">{item.nombre}</p>
+                    <p className="text-sm font-bold text-[#111111] whitespace-nowrap">{fmt(itemTotal(item))}</p>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    {item.es_peso
+                      ? <p className="flex-1 min-w-0 pl-1 text-xs text-orange-500 font-medium">{item.gramos}g · {fmt(item.precio_unitario)}/kg</p>
+                      : <p className="flex-1 min-w-0 pl-1 text-xs text-mimi-500 font-medium">{fmt(item.precio_unitario)} c/u</p>
+                    }
+                    {item.es_peso ? (
+                      <button
+                        onClick={() => { setGramosInput(String(item.gramos)); setWeightPopup(products.find(p => p.id === item.product_id)) }}
+                        className="h-11 px-3 rounded-xl bg-orange-50 text-orange-600 text-sm font-semibold active:bg-orange-100 flex-shrink-0"
+                      >
+                        ✎ Editar
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => updateQty(item.product_id, -1)}
+                          aria-label="Restar uno"
+                          className="w-11 h-11 rounded-xl bg-mimi-50 text-mimi-500 font-bold text-xl flex items-center justify-center active:bg-mimi-100"
+                        >
+                          −
+                        </button>
+                        <span className="w-9 text-center text-base font-bold">{item.cantidad}</span>
+                        <button
+                          onClick={() => updateQty(item.product_id, 1)}
+                          aria-label="Sumar uno"
+                          className="w-11 h-11 rounded-xl bg-mimi-50 text-mimi-500 font-bold text-xl flex items-center justify-center active:bg-mimi-100"
+                        >
+                          +
+                        </button>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => removeItem(item.product_id)}
+                      aria-label="Quitar producto"
+                      className="w-11 h-11 rounded-xl text-red-400 active:bg-red-50 active:text-red-600 flex items-center justify-center flex-shrink-0"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
               ))}
-              <div className="flex justify-between font-bold text-sm text-[#111111] pt-1 border-t border-[#E5E7EB] mt-1">
-                <span>Total</span>
-                <span className="text-mimi-500 text-base">{fmt(total)}</span>
+            </div>
+          </div>
+
+          {/* Resumen: total, pago y acción principal */}
+          <div className="flex-shrink-0 flex flex-col justify-end gap-3 p-3 border-t portrait:border-t-0 portrait:border-l border-[#E5E7EB] portrait:w-64 portrait:overflow-y-auto">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm font-semibold text-[#444444]">Total</span>
+              <span className="text-2xl font-bold text-mimi-500 leading-none">{fmt(total)}</span>
+            </div>
+
+            {/* Pago (con cajero, el medio de pago lo elige el cajero al cobrar) */}
+            {!enviaACaja && (
+              <div>
+                <p className="text-xs font-semibold text-[#444444] uppercase tracking-wide mb-1.5">Método de pago</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {PAYMENT_METHODS.map(m => (
+                    <button
+                      key={m.value}
+                      onClick={() => setMetodoPago(m.value)}
+                      className={`min-h-[2.75rem] px-2 py-1 rounded-xl border text-sm font-semibold leading-tight transition-colors ${
+                        metodoPago === m.value
+                          ? 'bg-mimi-500 border-mimi-500 text-white'
+                          : 'bg-white border-[#E5E7EB] text-[#444444] active:bg-mimi-50'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Pago (con cajero, el medio de pago lo elige el cajero al cobrar) */}
-          {!tieneCajero && (
-            <div className="px-3 pb-3 border-t border-[#E5E7EB] pt-3">
-              <p className="text-xs font-semibold text-[#444444] uppercase tracking-wide mb-1.5">Método de pago</p>
-              <select className="input-field text-xs py-1.5" value={metodoPago} onChange={e => setMetodoPago(e.target.value)}>
-                {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
-            </div>
-          )}
-
-          <div className={`px-3 pb-4 ${tieneCajero ? 'border-t border-[#E5E7EB] pt-3' : ''}`}>
-            {tieneCajero ? (
-              <button onClick={openModal} disabled={loading || cart.length === 0} className="btn-primary w-full py-3 text-base">
+            {enviaACaja ? (
+              <button onClick={openModal} disabled={loading || cart.length === 0} className="btn-primary w-full h-14 text-lg active:bg-mimi-700">
                 {loading ? 'Enviando...' : '→ Enviar a caja'}
               </button>
             ) : (
-              <button onClick={openModal} disabled={loading || cart.length === 0} className="btn-primary w-full py-3 text-base">
-                {loading ? 'Registrando...' : '✓ Confirmar venta'}
+              <button onClick={openModal} disabled={loading || cart.length === 0} className="btn-primary w-full h-14 text-lg active:bg-mimi-700">
+                {loading ? 'Registrando...' : esCajero ? '✓ Cobrar' : '✓ Confirmar venta'}
               </button>
             )}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Modal datos del cliente */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-bold text-[#111111] mb-1">Datos del cliente</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-5 sm:p-6">
+            <h2 className="text-xl font-bold text-[#111111] mb-1">Datos del cliente</h2>
             <p className="text-sm text-[#444444] mb-4">Ingresá el teléfono del cliente o continuá como invitado.</p>
             <div className="space-y-3">
               <div>
                 <input
-                  className="input-field text-sm"
+                  className="input-field h-12 text-base"
                   placeholder="Teléfono / WhatsApp"
+                  inputMode="tel"
                   value={clienteForm.whatsapp}
                   onChange={e => setClienteForm(f => ({ ...f, whatsapp: e.target.value }))}
                   autoFocus
                 />
                 {lookupLoading && (
-                  <p className="text-xs text-[#444444] mt-1 ml-1">Buscando cliente…</p>
+                  <p className="text-sm text-[#444444] mt-1 ml-1">Buscando cliente…</p>
                 )}
                 {!lookupLoading && matchedClient && clienteNombreRegistrado && (
                   <div className="mt-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
-                    <p className="text-sm font-semibold text-green-700">✓ {clienteNombreRegistrado}</p>
-                    <p className="text-xs text-green-600">
+                    <p className="text-base font-semibold text-green-700">✓ {clienteNombreRegistrado}</p>
+                    <p className="text-sm text-green-600">
                       {matchedClient.nivel ? `${matchedClient.nivel} · ` : ''}{matchedClient.puntos_vigentes ?? 0} pts · No hace falta cargar el nombre
                     </p>
                   </div>
                 )}
                 {!lookupLoading && matchedClient && !clienteNombreRegistrado && (
-                  <p className="text-xs text-orange-600 mt-1 ml-1">Cliente sin nombre registrado — ingresá el nombre.</p>
+                  <p className="text-sm text-orange-600 mt-1 ml-1">Cliente sin nombre registrado — ingresá el nombre.</p>
                 )}
               </div>
               <input
-                className="input-field text-sm"
+                className="input-field h-12 text-base"
                 placeholder={nombreObligatorio ? 'Nombre *' : 'Nombre (opcional)'}
                 value={clienteForm.nombre}
                 onChange={e => setClienteForm(f => ({ ...f, nombre: e.target.value }))}
               />
               <input
-                className="input-field text-sm"
+                className="input-field h-12 text-base"
                 placeholder="Email (opcional)"
                 type="email"
                 value={clienteForm.email}
@@ -577,14 +652,14 @@ export default function POS() {
               />
             </div>
             <div className="flex gap-2 mt-5">
-              <button onClick={handleInvitado} className="flex-1 py-2.5 rounded-xl border border-[#E5E7EB] text-sm font-semibold text-[#444444] hover:bg-gray-50">
+              <button onClick={handleInvitado} className="flex-1 h-14 rounded-xl border border-[#E5E7EB] text-base font-semibold text-[#444444] hover:bg-gray-50 active:bg-gray-100">
                 Invitado
               </button>
-              <button onClick={handleGuardar} className="flex-1 py-2.5 rounded-xl bg-mimi-500 text-white text-sm font-semibold hover:bg-mimi-600">
+              <button onClick={handleGuardar} className="flex-1 h-14 rounded-xl bg-mimi-500 text-white text-base font-semibold hover:bg-mimi-600 active:bg-mimi-700">
                 Guardar
               </button>
             </div>
-            <button onClick={() => setShowModal(false)} className="w-full mt-3 text-xs text-[#444444] hover:text-[#111111]">
+            <button onClick={() => setShowModal(false)} className="w-full mt-2 h-11 rounded-xl text-sm text-[#444444] hover:text-[#111111] active:bg-gray-100">
               Cancelar
             </button>
           </div>
@@ -593,15 +668,16 @@ export default function POS() {
 
       {/* Popup gramos */}
       {weightPopup && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-bold text-[#111111] mb-0.5">{weightPopup.nombre}</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-5 sm:p-6">
+            <h2 className="text-xl font-bold text-[#111111] mb-0.5">{weightPopup.nombre}</h2>
             <p className="text-sm text-[#444444] mb-5">Precio: {fmt(weightPopup.precio)} por kilo</p>
             <div className="mb-4">
               <label className="block text-sm font-semibold text-[#111111] mb-1">Gramos</label>
               <input
-                className="input-field text-2xl font-bold text-center"
+                className="input-field h-16 text-3xl font-bold text-center"
                 type="number"
+                inputMode="numeric"
                 min="1"
                 step="1"
                 autoFocus
@@ -624,13 +700,13 @@ export default function POS() {
               <button
                 onClick={addWeightToCart}
                 disabled={!gramosInput || parseInt(gramosInput) <= 0}
-                className="btn-primary flex-1 py-3"
+                className="btn-primary flex-1 h-14 text-base active:bg-mimi-700"
               >
                 Agregar al carrito
               </button>
               <button
                 onClick={() => { setWeightPopup(null); setGramosInput('') }}
-                className="btn-secondary flex-1 py-3"
+                className="btn-secondary flex-1 h-14 text-base active:bg-mimi-50"
               >
                 Cancelar
               </button>

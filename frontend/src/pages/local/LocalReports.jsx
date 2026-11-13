@@ -79,7 +79,7 @@ export default function LocalReports() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="card p-0 overflow-hidden">
+        <div className="card p-0 overflow-x-auto">
           <div className="px-6 py-4 border-b border-[#E5E7EB]">
             <h2 className="text-base font-semibold text-[#111111]">Mis productos más vendidos</h2>
             <p className="text-xs text-[#444444] mt-0.5">Por Kilogramo</p>
@@ -107,7 +107,7 @@ export default function LocalReports() {
           </table>
         </div>
 
-        <div className="card p-0 overflow-hidden">
+        <div className="card p-0 overflow-x-auto">
           <div className="px-6 py-4 border-b border-[#E5E7EB]">
             <h2 className="text-base font-semibold text-[#111111]">Mis productos más vendidos</h2>
             <p className="text-xs text-[#444444] mt-0.5">Por Unidad</p>

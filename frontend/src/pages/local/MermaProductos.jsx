@@ -94,7 +94,7 @@ export default function MermaProductos() {
   const fechaHoy = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3rem)]">
+    <div className="flex flex-col h-[calc(100dvh-5.5rem)]">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-[#111111]">Merma de Productos</h1>
         <div className="flex gap-2">

@@ -3,6 +3,11 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    /* Tablet: sin delay/zoom por doble toque ni resaltado gris al tocar */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
   body {
     @apply font-sans text-[#111111] bg-white;
   }
@@ -29,4 +34,11 @@
     to   { transform: translateX(0); }
   }
   .animate-drawer { animation: drawerIn 0.2s ease-out; }
+}
+
+/* En pantallas táctiles, inputs con texto chico pasan a 16px para que iOS no haga zoom al enfocarlos */
+@media (pointer: coarse) {
+  :is(input, select, textarea):is(.text-xs, .text-sm) {
+    font-size: 16px;
+  }
 }

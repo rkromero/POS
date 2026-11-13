@@ -78,7 +78,7 @@ export default function Ticket({ sale, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[90dvh] flex flex-col">
         <div className="overflow-auto flex-1 p-6">
           {/* Header */}
           <div className="text-center mb-4">
@@ -137,10 +137,10 @@ export default function Ticket({ sale, onClose }) {
         </div>
 
         <div className="flex gap-2 px-6 pb-6 border-t border-[#E5E7EB] pt-4">
-          <button onClick={handlePrint} className="btn-secondary flex-1 text-sm">
+          <button onClick={handlePrint} className="btn-secondary flex-1 text-sm min-h-[3rem]">
             🖨️ Imprimir
           </button>
-          <button onClick={onClose} className="btn-primary flex-1 text-sm">
+          <button onClick={onClose} className="btn-primary flex-1 text-sm min-h-[3rem]">
             Cerrar
           </button>
         </div>

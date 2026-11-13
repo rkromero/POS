@@ -1,16 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 
-function NavItem({ to, icon, label, onNavigate }) {
+function NavItem({ to, icon, label, onNavigate, touch }) {
   return (
     <NavLink
       to={to}
       end={to === '/admin' || to === '/local' || to === '/cajero'}
       onClick={onNavigate}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-4 py-2.5 rounded-xl mx-2 text-sm font-medium transition-colors ${
+        `flex items-center gap-3 px-4 rounded-xl mx-2 font-medium transition-colors ${touch ? 'py-3.5 text-base active:bg-gray-100' : 'py-2.5 text-sm'} ${
           isActive
             ? 'bg-mimi-50 text-mimi-500'
             : 'text-[#444444] hover:bg-gray-50 hover:text-[#111111]'
@@ -23,7 +23,7 @@ function NavItem({ to, icon, label, onNavigate }) {
   )
 }
 
-function SidebarContent({ links, user, onLogout, onNavigate, headerRight }) {
+function SidebarContent({ links, user, onLogout, onNavigate, headerRight, touch }) {
   return (
     <>
       {/* Logo */}
@@ -35,7 +35,7 @@ function SidebarContent({ links, user, onLogout, onNavigate, headerRight }) {
 
       {/* Nav */}
       <nav className="flex flex-col gap-0.5 pt-4 flex-1 overflow-y-auto">
-        {links.map(link => <NavItem key={link.to} {...link} onNavigate={onNavigate} />)}
+        {links.map(link => <NavItem key={link.to} {...link} onNavigate={onNavigate} touch={touch} />)}
       </nav>
 
       {/* User */}
@@ -49,7 +49,7 @@ function SidebarContent({ links, user, onLogout, onNavigate, headerRight }) {
             <p className="text-xs text-[#444444] truncate mt-0.5">{user?.local_nombre || 'Administrador'}</p>
           </div>
         </div>
-        <button onClick={onLogout} className="btn-secondary w-full text-sm py-1.5">
+        <button onClick={onLogout} className={`btn-secondary w-full text-sm ${touch ? 'py-3' : 'py-1.5'}`}>
           Cerrar sesión
         </button>
       </div>
@@ -61,7 +61,76 @@ const PosBadge = () => (
   <span className="text-xs text-mimi-500 font-semibold bg-mimi-50 px-1.5 py-0.5 rounded-full">POS</span>
 )
 
-export default function Sidebar({ links }) {
+const HamburgerIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="18" x2="21" y2="18" />
+  </svg>
+)
+
+/**
+ * Modo drawer en todos los anchos: sin sidebar fijo ni barra superior.
+ * Un botón hamburguesa flotante (esquina superior izquierda) abre el menú superpuesto.
+ */
+function CollapsibleSidebar({ links, user, onLogout }) {
+  const [open, setOpen] = useState(false)
+  const close = () => setOpen(false)
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        aria-label="Abrir menú"
+        aria-expanded={open}
+        className="fixed top-2 left-2 z-40 w-11 h-11 flex items-center justify-center rounded-xl bg-white border border-[#E5E7EB] shadow-sm text-[#111111] active:bg-gray-100 touch-manipulation"
+      >
+        <HamburgerIcon />
+      </button>
+
+      <div className={`fixed inset-0 z-50 ${open ? '' : 'pointer-events-none'}`} aria-hidden={!open}>
+        <div
+          onClick={close}
+          className={`absolute inset-0 bg-black/50 transition-opacity duration-200 ${open ? 'opacity-100' : 'opacity-0'}`}
+        />
+        <aside
+          className={`absolute top-0 left-0 h-full w-72 max-w-[85%] bg-white shadow-xl flex flex-col transition-transform duration-200 ease-out ${
+            open ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <SidebarContent
+            links={links}
+            user={user}
+            onLogout={onLogout}
+            onNavigate={close}
+            touch
+            headerRight={
+              <div className="flex items-center gap-1">
+                <PosBadge />
+                <button
+                  onClick={close}
+                  aria-label="Cerrar menú"
+                  className="w-11 h-11 -mr-2 flex items-center justify-center rounded-xl active:bg-gray-100 text-[#444444] text-lg"
+                >
+                  ✕
+                </button>
+              </div>
+            }
+          />
+        </aside>
+      </div>
+    </>
+  )
+}
+
+export default function Sidebar({ links, collapsible = false }) {
   const { logout, user } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -70,6 +139,10 @@ export default function Sidebar({ links }) {
     await logout()
     toast.success('Sesión cerrada')
     navigate('/login')
+  }
+
+  if (collapsible) {
+    return <CollapsibleSidebar links={links} user={user} onLogout={handleLogout} />
   }
 
   return (

@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from '../../components/Sidebar'
 
 const localLinks = [
@@ -14,10 +14,20 @@ const localLinks = [
 ]
 
 export default function LocalLayout() {
+  const { pathname } = useLocation()
+  // El POS ocupa toda la pantalla y deja lugar al botón de menú en su barra superior
+  const isPOS = pathname === '/local' || pathname === '/local/'
+
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar links={localLinks} />
-      <main className="flex-1 min-w-0 overflow-auto px-4 sm:px-6 pb-6 pt-[4.5rem] md:pt-6">
+    <div className="min-h-[100dvh] bg-gray-50">
+      <Sidebar links={localLinks} collapsible />
+      <main
+        className={
+          isPOS
+            ? 'h-[100dvh] overflow-hidden p-2 sm:p-3'
+            : 'min-w-0 overflow-x-hidden px-4 sm:px-6 pb-6 pt-16'
+        }
+      >
         <Outlet />
       </main>
     </div>

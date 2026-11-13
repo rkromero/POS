@@ -21,15 +21,17 @@ export function escapeHtml(value) {
 }
 
 export const THERMAL_CSS = `
-  @page { size: 80mm auto; margin: 0; }
+  /* Sin "size": el tamaño lo define el papel configurado en el driver (los
+     drivers térmicos suelen rechazar tamaños a medida e imprimen en blanco). */
+  @page { margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
-    width: 80mm; margin: 0; padding: 0;
+    width: 72mm; margin: 0; padding: 0;
     background: #fff; color: #000;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   body { font-family: Arial, Helvetica, sans-serif; font-size: 12.5px; line-height: 1.3; }
-  .ticket { width: 80mm; padding: 2mm 4mm 10mm 4mm; color: #000; }
+  .ticket { width: 72mm; padding: 2mm 1mm 10mm 1mm; color: #000; }
   .center { text-align: center; }
   .logo { display: block; margin: 0 auto 2mm; max-width: 50mm; max-height: 20mm; filter: grayscale(100%) contrast(200%); }
   .title { font-size: 15px; font-weight: bold; word-break: break-word; }
@@ -96,7 +98,7 @@ export async function printThermal(htmlBody, { title = 'Ticket' } = {}) {
   const iframe = document.createElement('iframe')
   iframe.setAttribute('aria-hidden', 'true')
   // Fuera de pantalla pero con ancho real de 80 mm para que el alto medido sea correcto.
-  iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:80mm;height:10px;border:0;opacity:0;pointer-events:none;'
+  iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:72mm;height:10px;border:0;opacity:0;pointer-events:none;'
   document.body.appendChild(iframe)
 
   let removed = false
@@ -115,7 +117,6 @@ export async function printThermal(htmlBody, { title = 'Ticket' } = {}) {
 
     await waitForLoad(iframe, doc)
     await waitForImages(doc)
-    fitPageToContent(doc)
 
     win.addEventListener('afterprint', () => setTimeout(cleanup, 500), { once: true })
     setTimeout(cleanup, CLEANUP_FALLBACK_MS)

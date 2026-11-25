@@ -119,3 +119,33 @@ test('sin punto de venta en el local: error claro sin llamar a ARCA', async () =
   assert.match(r.factura_error, /punto de venta/);
   assert.equal(wsfeCalls.length, 0);
 });
+
+test('ARCA autoriza pero falla el guardado: conserva el número y el reintento la recupera sin emitir otra', async () => {
+  let fallarGuardado = true;
+  const orig = fakePool.connect;
+  fakePool.connect = async () => ({
+    query: async (sql, params) => {
+      if (fallarGuardado && /UPDATE sales SET factura_estado='autorizada'/.test(sql)) {
+        throw new Error('duplicate key value violates unique constraint "idx_sales_comprobante_unico"');
+      }
+      return fakeQuery(sql, params);
+    },
+    release() {},
+  });
+  try {
+    let r = await emitirFactura(7);
+    assert.equal(r.factura_estado, 'error');
+    assert.equal(r.cbte_nro, 42);
+    assert.match(r.factura_error, /autorizó el comprobante 42/);
+
+    fallarGuardado = false;
+    wsfeCalls = [];
+    wsfeImpl.feCompConsultar = async () => ({ CodAutorizacion: '76123456789012', ImpTotal: '1500.5', DocTipo: '99', DocNro: '0', FchVto: '20261205', CbteFch: '20261125' });
+    r = await emitirFactura(7);
+    assert.equal(r.factura_estado, 'autorizada');
+    assert.equal(r.cbte_nro, 42);
+    assert.ok(!wsfeCalls.some((c) => c[0] === 'feCAESolicitar'), 'no debe emitir una segunda factura');
+  } finally {
+    fakePool.connect = orig;
+  }
+});

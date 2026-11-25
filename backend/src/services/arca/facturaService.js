@@ -154,6 +154,7 @@ async function emitirFactura(saleId) {
     if (sale.factura_estado === 'autorizada') return await getFullSale(saleId, client);
 
     let nro = null;
+    let autorizadaEnArca = false;
     try {
       if (await intentarRecuperar(client, sale, pv, calc)) return await getFullSale(saleId, client);
 
@@ -172,6 +173,7 @@ async function emitirFactura(saleId) {
 
       const resp = await wsfe.feCAESolicitar(armarSolicitud({ pv, nro, fecha: fecha.afip, calc, docTipo, docNro }));
       if (resp.resultado === 'A' && resp.cae) {
+        autorizadaEnArca = true;
         await marcarAutorizada(client, saleId, {
           cae: String(resp.cae),
           caeVto: afipToIso(resp.caeVto),
@@ -184,12 +186,16 @@ async function emitirFactura(saleId) {
     } catch (err) {
       // Si no sabemos si ARCA la autorizó, conservamos el número para recuperarla en el reintento.
       // Si falló antes de pedir un número nuevo, se conserva el de un intento previo (si lo hay).
-      const incierto = Boolean(err.incierto) && nro !== null;
+      // Si ARCA ya la autorizó y falló el guardado, el número DEBE conservarse: el reintento
+      // la recupera con FECompConsultar en vez de emitir una factura nueva.
+      const incierto = (Boolean(err.incierto) || autorizadaEnArca) && nro !== null;
       const mensaje = err.name === 'ArcaError' ? err.message : `Error al facturar: ${err.message}`;
-      console.error(`[ARCA] venta ${saleId}: ${mensaje}`);
-      await marcarError(client, saleId, incierto
-        ? `${mensaje}. Estado incierto: reintentá para verificar si ARCA la autorizó`
-        : mensaje, { conservarNumero: incierto || nro === null });
+      console.error(`[ARCA] venta ${saleId}${autorizadaEnArca ? ` (AUTORIZADA en ARCA nro ${nro})` : ''}: ${mensaje}`);
+      await marcarError(client, saleId, autorizadaEnArca
+        ? `${mensaje}. ARCA autorizó el comprobante ${nro} pero no se pudo guardar: reintentá para recuperarlo`
+        : incierto
+          ? `${mensaje}. Estado incierto: reintentá para verificar si ARCA la autorizó`
+          : mensaje, { conservarNumero: incierto || nro === null });
     }
     return await getFullSale(saleId, client);
   } finally {

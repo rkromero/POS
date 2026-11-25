@@ -44,6 +44,8 @@ export const THERMAL_CSS = `
   .wrap { word-break: break-word; overflow-wrap: anywhere; }
   .total { font-size: 18px; font-weight: bold; }
   .footer { text-align: center; margin-top: 4mm; font-weight: bold; }
+  .small { font-size: 11px; }
+  .qr { display: block; margin: 3mm auto 0; width: 34mm; height: 34mm; image-rendering: pixelated; }
 `
 
 function waitForImages(doc) {

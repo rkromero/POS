@@ -10,6 +10,7 @@ const adminLinks = [
   { to: '/admin/pedidos-fabrica', icon: '🏭', label: 'Pedidos a Fábrica' },
   { to: '/admin/mayoristas', icon: '🏬', label: 'Mayoristas' },
   { to: '/admin/fidelizacion', icon: '⭐', label: 'Fidelización' },
+  { to: '/admin/facturacion', icon: '🧾', label: 'Facturación ARCA' },
   { to: '/admin/cierres-caja', icon: '💰', label: 'Cierres de Caja' },
   { to: '/admin/pedidos-por-cobrar', icon: '🧾', label: 'Pedidos por cobrar' },
 ]

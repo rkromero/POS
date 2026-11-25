@@ -24,6 +24,7 @@ import AdminFactoryOrders from './pages/admin/FactoryOrders'
 import WholesaleClients from './pages/admin/WholesaleClients'
 import WholesaleOrders from './pages/admin/WholesaleOrders'
 import Fidelizacion from './pages/admin/Fidelizacion'
+import Facturacion from './pages/admin/Facturacion'
 import MisPuntos from './pages/MisPuntos'
 import AdminCierresCaja from './pages/admin/CierresCaja'
 import AdminPedidosPorCobrar from './pages/admin/PedidosPorCobrar'
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="mayoristas" element={<WholesaleClients />} />
           <Route path="mayoristas/nuevo-pedido" element={<WholesaleOrders />} />
           <Route path="fidelizacion" element={<Fidelizacion />} />
+          <Route path="facturacion" element={<Facturacion />} />
           <Route path="cierres-caja" element={<AdminCierresCaja />} />
           <Route path="pedidos-por-cobrar" element={<AdminPedidosPorCobrar />} />
         </Route>

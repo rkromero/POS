@@ -20,6 +20,7 @@ const wholesaleClientRoutes = require('./routes/wholesaleClients');
 const wholesaleOrderRoutes = require('./routes/wholesaleOrders');
 const wholesalePaymentRoutes = require('./routes/wholesalePayments');
 const cashierOrderRoutes = require('./routes/cashierOrders');
+const arcaRoutes = require('./routes/arca');
 
 const pool = require('./db/pool');
 
@@ -268,6 +269,63 @@ async function runMigrations() {
     `);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_cashier_orders_local_estado ON cashier_orders (local_id, estado)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_cashier_order_items_order ON cashier_order_items (order_id)`);
+    // ── Facturación electrónica ARCA (Factura C, emisor monotributista) ──
+    await client.query(`ALTER TABLE locals ADD COLUMN IF NOT EXISTS arca_punto_venta INTEGER`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS tipo_ticket VARCHAR(10) NOT NULL DEFAULT 'mostrador'`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS factura_estado VARCHAR(12)`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS cbte_tipo INTEGER`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS punto_venta INTEGER`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS cbte_nro BIGINT`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS cae VARCHAR(20)`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS cae_vto DATE`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS factura_fecha DATE`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS imp_neto NUMERIC(12,2)`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS imp_iva NUMERIC(12,2)`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS imp_op_ex NUMERIC(12,2)`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS doc_tipo INTEGER`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS doc_nro BIGINT`);
+    await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS factura_error TEXT`);
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sales_tipo_ticket_check') THEN
+          ALTER TABLE sales ADD CONSTRAINT sales_tipo_ticket_check CHECK (tipo_ticket IN ('mostrador','fiscal'));
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sales_factura_estado_check') THEN
+          ALTER TABLE sales ADD CONSTRAINT sales_factura_estado_check
+            CHECK (factura_estado IS NULL OR factura_estado IN ('pendiente','autorizada','error'));
+        END IF;
+      END $$
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_comprobante_unico
+      ON sales (cbte_tipo, punto_venta, cbte_nro) WHERE cae IS NOT NULL
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_sales_factura_estado ON sales (factura_estado) WHERE factura_estado IS NOT NULL`);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS arca_config (
+        id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+        razon_social VARCHAR(150),
+        domicilio_comercial VARCHAR(200),
+        iibb VARCHAR(30),
+        inicio_actividades DATE,
+        condicion_iva VARCHAR(60) NOT NULL DEFAULT 'Responsable Monotributo',
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`INSERT INTO arca_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+    // Tickets de acceso de WSAA (cacheados: WSAA no da otro mientras haya uno vigente)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS arca_ta (
+        env VARCHAR(15) NOT NULL,
+        service VARCHAR(30) NOT NULL,
+        token TEXT NOT NULL,
+        sign TEXT NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (env, service)
+      )
+    `);
     console.log('✅ Tablas de mayoristas verificadas/creadas');
   } catch (err) {
     console.error('⚠️ Error en migración automática:', err.message);
@@ -312,6 +370,7 @@ app.use('/api/wholesale-clients', wholesaleClientRoutes);
 app.use('/api/wholesale-orders', wholesaleOrderRoutes);
 app.use('/api/wholesale-payments', wholesalePaymentRoutes);
 app.use('/api/pedidos-caja', cashierOrderRoutes);
+app.use('/api/arca', arcaRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'Mimí POS' }));
 

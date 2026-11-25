@@ -2,7 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import Ticket from '../../components/Ticket'
+import ClienteModal from '../../components/pos/ClienteModal'
+import WeightPopup from '../../components/pos/WeightPopup'
+import CartTabs from '../../components/pos/CartTabs'
+import CartItemRow from '../../components/pos/CartItemRow'
+import { handleFiscalResult, TIPO_MOSTRADOR } from '../../utils/factura'
 import { useAuth } from '../../context/AuthContext'
+import { STORAGE_KEY, makeCart, nextClienteName, loadInitial } from '../../utils/posCarts'
 
 const PAYMENT_METHODS = [
   { value: 'efectivo', label: 'Efectivo' },
@@ -12,41 +18,6 @@ const PAYMENT_METHODS = [
 ]
 
 const fmt = (v) => `$${parseFloat(v).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
-
-const STORAGE_KEY = 'pos_carts'
-
-const newId = () =>
-  (typeof crypto !== 'undefined' && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : `c${Date.now()}${Math.floor(Math.random() * 1e6)}`
-
-const makeCart = (nombre) => ({ id: newId(), nombre, items: [], metodoPago: 'efectivo' })
-
-// Devuelve el primer nombre "Cliente N" libre, rellenando huecos
-const nextClienteName = (existing) => {
-  const names = new Set(existing.map(c => c.nombre))
-  let n = 1
-  while (names.has(`Cliente ${n}`)) n++
-  return `Cliente ${n}`
-}
-
-const loadInitial = () => {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
-    if (saved && Array.isArray(saved.carts) && saved.carts.length) {
-      const carts = saved.carts.map(c => ({
-        id: c.id || newId(),
-        nombre: c.nombre || 'Cliente',
-        items: Array.isArray(c.items) ? c.items : [],
-        metodoPago: c.metodoPago || 'efectivo',
-      }))
-      const activeCartId = carts.find(c => c.id === saved.activeCartId)?.id || carts[0].id
-      return { carts, activeCartId }
-    }
-  } catch { /* noop */ }
-  const first = makeCart('Cliente 1')
-  return { carts: [first], activeCartId: first.id }
-}
 
 export default function POS() {
   const [products, setProducts] = useState([])
@@ -59,17 +30,15 @@ export default function POS() {
   if (!initialRef.current) initialRef.current = loadInitial()
   const [carts, setCarts] = useState(initialRef.current.carts)
   const [activeCartId, setActiveCartId] = useState(initialRef.current.activeCartId)
-  const [editingCartId, setEditingCartId] = useState(null)
-  const [editingName, setEditingName] = useState('')
 
   const [loading, setLoading] = useState(false)
   const [ticket, setTicket] = useState(null)
   const [showModal, setShowModal] = useState(false)
-  const [clienteForm, setClienteForm] = useState({ nombre: '', email: '', whatsapp: '' })
-  const [matchedClient, setMatchedClient] = useState(null)
-  const [lookupLoading, setLookupLoading] = useState(false)
+  // Tipo de comprobante en curso ('fiscal' | 'mostrador' | 'caja'); bloquea el doble envío
+  const [busy, setBusy] = useState(false)
+  const submittingRef = useRef(false)
   const [weightPopup, setWeightPopup] = useState(null)
-  const [gramosInput, setGramosInput] = useState('')
+  const [weightInitial, setWeightInitial] = useState('')
   // Si el local tiene cajero, el POS no cobra: envía el pedido a caja
   const [tieneCajero, setTieneCajero] = useState(false)
   const { user } = useAuth()
@@ -115,34 +84,6 @@ export default function POS() {
   useEffect(() => {
     if (!carts.some(c => c.id === activeCartId)) setActiveCartId(carts[0].id)
   }, [carts, activeCartId])
-
-  // Buscar cliente por teléfono mientras se carga el pedido (debounce)
-  useEffect(() => {
-    if (!showModal) return
-    const phone = clienteForm.whatsapp.trim()
-    if (phone.length < 5) { setMatchedClient(null); setLookupLoading(false); return }
-    let cancelled = false
-    setLookupLoading(true)
-    const t = setTimeout(async () => {
-      try {
-        const res = await api.get('/loyalty/search', { params: { q: phone } })
-        if (cancelled) return
-        const c = res.data
-        // Sólo es un match si coincide el teléfono (no por nombre via fallback del backend)
-        const isPhoneMatch = c && c.whatsapp && String(c.whatsapp).trim() === phone
-        setMatchedClient(isPhoneMatch ? c : null)
-      } catch {
-        if (!cancelled) setMatchedClient(null)
-      } finally {
-        if (!cancelled) setLookupLoading(false)
-      }
-    }, 400)
-    return () => { cancelled = true; clearTimeout(t) }
-  }, [clienteForm.whatsapp, showModal])
-
-  // El nombre sólo es obligatorio si el teléfono no existe en la base o el cliente no tiene nombre
-  const clienteNombreRegistrado = matchedClient?.nombre?.trim() || ''
-  const nombreObligatorio = !clienteNombreRegistrado
 
   const filtered = products.filter(p => {
     const matchSearch = !search || p.nombre.toLowerCase().includes(search.toLowerCase())
@@ -192,21 +133,11 @@ export default function POS() {
 
   const renameCart = (id, nombre) => setCarts(prev => prev.map(c => c.id === id ? { ...c, nombre } : c))
 
-  const startRename = (c) => { setEditingCartId(c.id); setEditingName(c.nombre) }
-  const commitRename = () => {
-    if (editingCartId) {
-      const name = editingName.trim()
-      if (name) renameCart(editingCartId, name)
-    }
-    setEditingCartId(null)
-    setEditingName('')
-  }
-  const cancelRename = () => { setEditingCartId(null); setEditingName('') }
 
   // ── Items ───────────────────────────────────────────────────────────
   const addToCart = (product) => {
     if (product.unidad_medida === 'kg') {
-      setGramosInput('')
+      setWeightInitial('')
       setWeightPopup(product)
       return
     }
@@ -222,7 +153,7 @@ export default function POS() {
     })
   }
 
-  const addWeightToCart = () => {
+  const addWeightToCart = (gramosInput) => {
     const gramos = parseInt(gramosInput)
     if (!gramos || gramos <= 0) { toast.error('Ingresá una cantidad válida de gramos'); return }
     const p = weightPopup
@@ -247,7 +178,6 @@ export default function POS() {
       }]
     })
     setWeightPopup(null)
-    setGramosInput('')
   }
 
   const updateQty = (product_id, delta) => {
@@ -270,20 +200,30 @@ export default function POS() {
 
   const itemTotal = (i) => i.es_peso ? i.subtotal : i.precio_unitario * i.cantidad
   const total = cart.reduce((s, i) => s + itemTotal(i), 0)
-  const cartCount = (c) => c.items.reduce((s, i) => s + (i.es_peso ? 1 : i.cantidad), 0)
 
   const openModal = () => {
     if (cart.length === 0) return toast.error('Agregá al menos un producto')
-    setClienteForm({ nombre: '', email: '', whatsapp: '' })
-    setMatchedClient(null)
-    setLookupLoading(false)
     setShowModal(true)
+  }
+
+  // Evita doble envío: marca el envío en curso o devuelve false si ya hay uno
+  const beginSubmit = (tipo) => {
+    if (submittingRef.current) return false
+    submittingRef.current = true
+    setBusy(tipo)
+    setLoading(true)
+    return true
+  }
+  const endSubmit = () => {
+    submittingRef.current = false
+    setBusy(false)
+    setLoading(false)
   }
 
   const submitPedido = async (cliente) => {
     const pedidoCart = activeCart
+    if (!beginSubmit('caja')) return
     setShowModal(false)
-    setLoading(true)
     try {
       await api.post('/pedidos-caja', {
         nombre_carrito: pedidoCart.nombre,
@@ -299,48 +239,38 @@ export default function POS() {
       // Si el local ya no tiene cajero, volvemos al modo de cobro normal
       if (err.response?.status === 400) loadCajeroConfig()
     } finally {
-      setLoading(false)
+      endSubmit()
     }
   }
 
-  const submitSale = async (cliente) => {
+  // tipo: 'fiscal' (Factura C ARCA) | 'mostrador'; doc: { doc_tipo, doc_nro } opcional
+  const submitSale = async (cliente, tipo = TIPO_MOSTRADOR, doc = {}) => {
     if (enviaACaja) return submitPedido(cliente)
     const saleCart = activeCart
-    setShowModal(false)
-    setLoading(true)
+    if (!beginSubmit(tipo)) return
     try {
       const res = await api.post('/sales', {
         cliente_nombre: cliente.nombre,
         cliente_email: cliente.email || null,
         cliente_whatsapp: cliente.whatsapp || null,
         metodo_pago: saleCart.metodoPago,
+        tipo_ticket: tipo,
+        ...doc,
         items: saleCart.items.map(i => ({ product_id: i.product_id, cantidad: i.es_peso ? i.gramos : i.cantidad })),
       })
+      setShowModal(false)
       setTicket(res.data)
       closeCart(saleCart.id)
       toast.success('¡Venta registrada!')
+      // Factura autorizada → se imprime sola en la comandera; si ARCA falló, avisa
+      handleFiscalResult(res.data)
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error al registrar venta')
       // Se asignó un cajero al local: pasamos a modo "Enviar a caja"
-      if (err.response?.status === 403) loadCajeroConfig()
+      if (err.response?.status === 403) { setShowModal(false); loadCajeroConfig() }
     } finally {
-      setLoading(false)
+      endSubmit()
     }
-  }
-
-  const handleGuardar = () => {
-    // El nombre tipeado tiene prioridad; si no, usamos el que ya está registrado para ese teléfono
-    const nombre = clienteForm.nombre.trim() || clienteNombreRegistrado
-    if (!nombre) return toast.error('El nombre del cliente es requerido')
-    submitSale({
-      nombre,
-      email: clienteForm.email.trim() || matchedClient?.email || null,
-      whatsapp: clienteForm.whatsapp.trim() || null,
-    })
-  }
-
-  const handleInvitado = () => {
-    submitSale({ nombre: 'Invitado', email: null, whatsapp: null })
   }
 
   // Layout tablet: horizontal → grilla + carrito al costado; vertical → grilla arriba + carrito abajo
@@ -428,72 +358,14 @@ export default function POS() {
 
       {/* Panel carrito */}
       <section className="flex-shrink-0 flex flex-col gap-2 min-h-0 portrait:h-[42%] landscape:w-[22rem] xl:landscape:w-96">
-        {/* Pestañas de carritos (el "+" queda fijo al final, fuera del scroll) */}
-        <div className="flex items-start gap-2 flex-shrink-0">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-1 min-w-0">
-            {carts.map(c => {
-              const isActive = c.id === activeCart.id
-              const count = cartCount(c)
-              return (
-                <div
-                  key={c.id}
-                  className={`h-12 flex items-center rounded-xl flex-shrink-0 border transition-colors ${
-                    isActive ? 'bg-mimi-500 border-mimi-500 text-white' : 'bg-white border-[#E5E7EB] text-[#444444]'
-                  }`}
-                >
-                  {editingCartId === c.id ? (
-                    <input
-                      autoFocus
-                      value={editingName}
-                      onChange={e => setEditingName(e.target.value)}
-                      onBlur={commitRename}
-                      onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') cancelRename() }}
-                      enterKeyHint="done"
-                      className="w-36 h-10 mx-1 text-base text-[#111111] rounded-lg px-2 border border-mimi-100 outline-none"
-                    />
-                  ) : (
-                    <button
-                      onClick={() => setActiveCartId(c.id)}
-                      onDoubleClick={() => startRename(c)}
-                      title="Doble toque para renombrar"
-                      className="h-full pl-3 pr-2 text-sm font-semibold whitespace-nowrap max-w-[10rem] truncate"
-                    >
-                      {c.nombre}
-                      {count > 0 && <span className={isActive ? 'text-white/80 ml-1' : 'text-mimi-500 ml-1'}>·{count}</span>}
-                    </button>
-                  )}
-                  {isActive && editingCartId !== c.id && (
-                    <button
-                      onClick={() => startRename(c)}
-                      aria-label="Renombrar carrito"
-                      className="h-full w-9 flex items-center justify-center text-sm active:bg-white/25 rounded-lg"
-                    >
-                      ✎
-                    </button>
-                  )}
-                  {carts.length > 1 && (
-                    <button
-                      onClick={() => removeCart(c.id)}
-                      aria-label="Cerrar carrito"
-                      className={`h-full w-10 flex items-center justify-center text-sm flex-shrink-0 rounded-r-xl ${
-                        isActive ? 'active:bg-white/25' : 'active:bg-gray-100'
-                      }`}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-          <button
-            onClick={addCart}
-            aria-label="Nuevo carrito"
-            className="flex-shrink-0 w-12 h-12 rounded-xl border-2 border-dashed border-mimi-100 text-mimi-500 text-2xl font-bold active:bg-mimi-50 flex items-center justify-center"
-          >
-            +
-          </button>
-        </div>
+        <CartTabs
+          carts={carts}
+          activeCartId={activeCart.id}
+          onSelect={setActiveCartId}
+          onRename={renameCart}
+          onRemove={removeCart}
+          onAdd={addCart}
+        />
 
         <div className="bg-white border border-[#E5E7EB] rounded-2xl shadow-sm flex flex-col portrait:flex-row flex-1 min-h-0 overflow-hidden">
           {/* Items */}
@@ -515,51 +387,14 @@ export default function POS() {
                 <p className="text-sm text-[#444444] text-center py-8">El carrito está vacío</p>
               )}
               {cart.map(item => (
-                <div key={`${item.product_id}-${item.es_peso ? item.gramos : 'u'}`} className="border border-[#E5E7EB] rounded-xl p-2">
-                  <div className="flex items-start justify-between gap-2 px-1">
-                    <p className="text-sm font-semibold text-[#111111] leading-tight line-clamp-2">{item.nombre}</p>
-                    <p className="text-sm font-bold text-[#111111] whitespace-nowrap">{fmt(itemTotal(item))}</p>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    {item.es_peso
-                      ? <p className="flex-1 min-w-0 pl-1 text-xs text-orange-500 font-medium">{item.gramos}g · {fmt(item.precio_unitario)}/kg</p>
-                      : <p className="flex-1 min-w-0 pl-1 text-xs text-mimi-500 font-medium">{fmt(item.precio_unitario)} c/u</p>
-                    }
-                    {item.es_peso ? (
-                      <button
-                        onClick={() => { setGramosInput(String(item.gramos)); setWeightPopup(products.find(p => p.id === item.product_id)) }}
-                        className="h-11 px-3 rounded-xl bg-orange-50 text-orange-600 text-sm font-semibold active:bg-orange-100 flex-shrink-0"
-                      >
-                        ✎ Editar
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => updateQty(item.product_id, -1)}
-                          aria-label="Restar uno"
-                          className="w-11 h-11 rounded-xl bg-mimi-50 text-mimi-500 font-bold text-xl flex items-center justify-center active:bg-mimi-100"
-                        >
-                          −
-                        </button>
-                        <span className="w-9 text-center text-base font-bold">{item.cantidad}</span>
-                        <button
-                          onClick={() => updateQty(item.product_id, 1)}
-                          aria-label="Sumar uno"
-                          className="w-11 h-11 rounded-xl bg-mimi-50 text-mimi-500 font-bold text-xl flex items-center justify-center active:bg-mimi-100"
-                        >
-                          +
-                        </button>
-                      </div>
-                    )}
-                    <button
-                      onClick={() => removeItem(item.product_id)}
-                      aria-label="Quitar producto"
-                      className="w-11 h-11 rounded-xl text-red-400 active:bg-red-50 active:text-red-600 flex items-center justify-center flex-shrink-0"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
+                <CartItemRow
+                  key={`${item.product_id}-${item.es_peso ? item.gramos : 'u'}`}
+                  item={item}
+                  total={itemTotal(item)}
+                  onEditWeight={() => { setWeightInitial(String(item.gramos)); setWeightPopup(products.find(p => p.id === item.product_id)) }}
+                  onQty={(delta) => updateQty(item.product_id, delta)}
+                  onRemove={() => removeItem(item.product_id)}
+                />
               ))}
             </div>
           </div>
@@ -606,113 +441,26 @@ export default function POS() {
         </div>
       </section>
 
-      {/* Modal datos del cliente */}
+      {/* Modal datos del cliente + elección de comprobante */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-5 sm:p-6">
-            <h2 className="text-xl font-bold text-[#111111] mb-1">Datos del cliente</h2>
-            <p className="text-sm text-[#444444] mb-4">Ingresá el teléfono del cliente o continuá como invitado.</p>
-            <div className="space-y-3">
-              <div>
-                <input
-                  className="input-field h-12 text-base"
-                  placeholder="Teléfono / WhatsApp"
-                  inputMode="tel"
-                  value={clienteForm.whatsapp}
-                  onChange={e => setClienteForm(f => ({ ...f, whatsapp: e.target.value }))}
-                  autoFocus
-                />
-                {lookupLoading && (
-                  <p className="text-sm text-[#444444] mt-1 ml-1">Buscando cliente…</p>
-                )}
-                {!lookupLoading && matchedClient && clienteNombreRegistrado && (
-                  <div className="mt-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
-                    <p className="text-base font-semibold text-green-700">✓ {clienteNombreRegistrado}</p>
-                    <p className="text-sm text-green-600">
-                      {matchedClient.nivel ? `${matchedClient.nivel} · ` : ''}{matchedClient.puntos_vigentes ?? 0} pts · No hace falta cargar el nombre
-                    </p>
-                  </div>
-                )}
-                {!lookupLoading && matchedClient && !clienteNombreRegistrado && (
-                  <p className="text-sm text-orange-600 mt-1 ml-1">Cliente sin nombre registrado — ingresá el nombre.</p>
-                )}
-              </div>
-              <input
-                className="input-field h-12 text-base"
-                placeholder={nombreObligatorio ? 'Nombre *' : 'Nombre (opcional)'}
-                value={clienteForm.nombre}
-                onChange={e => setClienteForm(f => ({ ...f, nombre: e.target.value }))}
-              />
-              <input
-                className="input-field h-12 text-base"
-                placeholder="Email (opcional)"
-                type="email"
-                value={clienteForm.email}
-                onChange={e => setClienteForm(f => ({ ...f, email: e.target.value }))}
-              />
-            </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={handleInvitado} className="flex-1 h-14 rounded-xl border border-[#E5E7EB] text-base font-semibold text-[#444444] hover:bg-gray-50 active:bg-gray-100">
-                Invitado
-              </button>
-              <button onClick={handleGuardar} className="flex-1 h-14 rounded-xl bg-mimi-500 text-white text-base font-semibold hover:bg-mimi-600 active:bg-mimi-700">
-                Guardar
-              </button>
-            </div>
-            <button onClick={() => setShowModal(false)} className="w-full mt-2 h-11 rounded-xl text-sm text-[#444444] hover:text-[#111111] active:bg-gray-100">
-              Cancelar
-            </button>
-          </div>
-        </div>
+        <ClienteModal
+          enviaACaja={enviaACaja}
+          total={total}
+          metodoPagoLabel={PAYMENT_METHODS.find(m => m.value === metodoPago)?.label || metodoPago}
+          busy={busy}
+          onSubmit={submitSale}
+          onCancel={() => setShowModal(false)}
+        />
       )}
 
       {/* Popup gramos */}
       {weightPopup && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-5 sm:p-6">
-            <h2 className="text-xl font-bold text-[#111111] mb-0.5">{weightPopup.nombre}</h2>
-            <p className="text-sm text-[#444444] mb-5">Precio: {fmt(weightPopup.precio)} por kilo</p>
-            <div className="mb-4">
-              <label className="block text-sm font-semibold text-[#111111] mb-1">Gramos</label>
-              <input
-                className="input-field h-16 text-3xl font-bold text-center"
-                type="number"
-                inputMode="numeric"
-                min="1"
-                step="1"
-                autoFocus
-                placeholder="350"
-                value={gramosInput}
-                onChange={e => setGramosInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addWeightToCart()}
-              />
-            </div>
-            {gramosInput > 0 && (
-              <div className="bg-mimi-50 rounded-xl p-3 mb-4 text-center">
-                <p className="text-xs text-[#444444] mb-0.5">Precio a cobrar</p>
-                <p className="text-2xl font-bold text-mimi-500">
-                  {fmt(parseFloat(weightPopup.precio) * parseInt(gramosInput) / 1000)}
-                </p>
-                <p className="text-xs text-[#444444] mt-0.5">{gramosInput}g</p>
-              </div>
-            )}
-            <div className="flex gap-2">
-              <button
-                onClick={addWeightToCart}
-                disabled={!gramosInput || parseInt(gramosInput) <= 0}
-                className="btn-primary flex-1 h-14 text-base active:bg-mimi-700"
-              >
-                Agregar al carrito
-              </button>
-              <button
-                onClick={() => { setWeightPopup(null); setGramosInput('') }}
-                className="btn-secondary flex-1 h-14 text-base active:bg-mimi-50"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
+        <WeightPopup
+          product={weightPopup}
+          initialGramos={weightInitial}
+          onAdd={addWeightToCart}
+          onCancel={() => setWeightPopup(null)}
+        />
       )}
 
       {ticket && <Ticket sale={ticket} onClose={() => setTicket(null)} />}

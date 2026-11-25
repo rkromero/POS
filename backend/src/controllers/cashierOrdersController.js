@@ -1,8 +1,9 @@
 const pool = require('../db/pool');
 const { awardPoints } = require('../services/loyaltyService');
 const {
-  METODOS_PAGO, localTieneCajero, priceItems, createSaleTx, getFullSale,
+  METODOS_PAGO, localTieneCajero, priceItems, createSaleTx, getFullSale, parseFiscalInput,
 } = require('../services/salesService');
+const { emitirFacturaSegura } = require('../services/arca/facturaService');
 
 const ORDER_SELECT = `
   SELECT co.*, u.nombre as user_nombre, l.nombre as local_nombre,
@@ -119,11 +120,13 @@ async function getAll(req, res, next) {
 // POST /api/pedidos-caja/:id/cobrar — el cajero cobra el pedido y se crea la venta
 async function cobrar(req, res, next) {
   const client = await pool.connect();
+  let released = false;
   try {
     const { metodo_pago } = req.body;
     if (!METODOS_PAGO.includes(metodo_pago)) {
       return res.status(400).json({ error: 'Método de pago inválido' });
     }
+    const fiscal = parseFiscalInput(req.body);
     const orderId = Number(req.params.id);
     if (!Number.isInteger(orderId) || orderId <= 0) {
       return res.status(400).json({ error: 'Pedido inválido' });
@@ -155,6 +158,7 @@ async function cobrar(req, res, next) {
       cliente_nombre: order.cliente_nombre || 'Invitado',
       cliente_email: order.cliente_email,
       cliente_whatsapp: order.cliente_whatsapp,
+      ...fiscal,
     });
 
     await client.query(
@@ -164,6 +168,12 @@ async function cobrar(req, res, next) {
       [req.user.id, saleId, orderId]
     );
     await client.query('COMMIT');
+    // Liberar la conexión antes de llamar a ARCA
+    client.release();
+    released = true;
+
+    // El cobro ya está confirmado: si la factura falla queda registrada en la venta
+    if (fiscal.tipo_ticket === 'fiscal') await emitirFacturaSegura(saleId);
 
     const saleData = await getFullSale(saleId);
     awardPoints(saleData);
@@ -171,10 +181,10 @@ async function cobrar(req, res, next) {
     res.json({ pedido_id: orderId, sale: saleData });
   } catch (err) {
     // ROLLBACK: si falta stock el pedido queda 'por_cobrar'
-    await client.query('ROLLBACK').catch(() => {});
+    if (!released) await client.query('ROLLBACK').catch(() => {});
     next(err);
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 }
 

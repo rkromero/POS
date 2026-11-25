@@ -76,7 +76,17 @@ export default function SalesHistory() {
           <tbody>
             {sales.map((s, i) => (
               <tr key={s.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                <td className="py-3 px-4 font-mono text-[#444444] text-xs">#{String(s.numero_comprobante).padStart(6, '0')}</td>
+                <td className="py-3 px-4 font-mono text-[#444444] text-xs whitespace-nowrap">
+                  #{String(s.numero_comprobante).padStart(6, '0')}
+                  {s.tipo_ticket && (
+                    <span className={`ml-2 font-sans text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                      s.tipo_ticket !== 'fiscal' ? 'bg-gray-100 text-gray-600'
+                        : s.factura_estado === 'autorizada' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                    }`}>
+                      {s.tipo_ticket === 'fiscal' ? (s.factura_estado === 'autorizada' ? 'Fiscal' : 'Fiscal ✕') : 'Mostrador'}
+                    </span>
+                  )}
+                </td>
                 <td className="py-3 px-4 font-medium">{s.cliente_nombre}</td>
                 <td className="py-3 px-4 text-[#444444]">{PAYMENT_LABELS[s.metodo_pago]}</td>
                 <td className="py-3 px-4 text-[#444444] text-xs">{fmtDate(s.created_at)}</td>
@@ -102,7 +112,7 @@ export default function SalesHistory() {
         </div>
       </div>
 
-      {selected && <Ticket sale={selected} onClose={() => setSelected(null)} />}
+      {selected && <Ticket sale={selected} onClose={() => setSelected(null)} onUpdated={load} />}
     </div>
   )
 }

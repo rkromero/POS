@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
-const EMPTY_LOCAL = { nombre: '', direccion: '', telefono: '', logo_url: '', activo: true }
+const EMPTY_LOCAL = { nombre: '', direccion: '', telefono: '', logo_url: '', arca_punto_venta: '', activo: true }
 const EMPTY_USER = { nombre: '', email: '', password: '', role: 'local', activo: true }
 
 export default function AdminLocals() {
@@ -33,16 +33,18 @@ export default function AdminLocals() {
 
   const openCreate = () => { setForm(EMPTY_LOCAL); setEditing(null); setShowModal(true) }
   const openEdit = (l) => {
-    setForm({ nombre: l.nombre, direccion: l.direccion || '', telefono: l.telefono || '', logo_url: l.logo_url || '', activo: l.activo })
+    setForm({ nombre: l.nombre, direccion: l.direccion || '', telefono: l.telefono || '', logo_url: l.logo_url || '', arca_punto_venta: l.arca_punto_venta ?? '', activo: l.activo })
     setEditing(l.id)
     setShowModal(true)
   }
 
   const save = async (e) => {
     e.preventDefault()
+    const pv = String(form.arca_punto_venta).trim()
+    const data = { ...form, arca_punto_venta: pv === '' ? null : parseInt(pv, 10) }
     try {
-      if (editing) { await api.put(`/locals/${editing}`, form); toast.success('Local actualizado') }
-      else { await api.post('/locals', form); toast.success('Local creado') }
+      if (editing) { await api.put(`/locals/${editing}`, data); toast.success('Local actualizado') }
+      else { await api.post('/locals', data); toast.success('Local creado') }
       setShowModal(false)
       load()
     } catch (err) { toast.error(err.response?.data?.error || 'Error al guardar') }
@@ -185,6 +187,16 @@ export default function AdminLocals() {
               <div>
                 <label className="block text-sm font-medium mb-1">Logo URL</label>
                 <input className="input-field" value={form.logo_url} onChange={e => set('logo_url', e.target.value)} placeholder="https://..." />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Punto de venta ARCA</label>
+                <input
+                  type="number" min="1" max="99999" step="1" inputMode="numeric"
+                  className="input-field" value={form.arca_punto_venta}
+                  onChange={e => set('arca_punto_venta', e.target.value)}
+                  placeholder="Ej: 2 — vacío = no factura"
+                />
+                <p className="text-xs text-[#444444] mt-1">Punto de venta "Web Services" dado de alta en ARCA para esta sucursal.</p>
               </div>
               {editing && (
                 <label className="flex items-center gap-2 cursor-pointer">

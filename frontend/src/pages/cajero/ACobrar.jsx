@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import Ticket from '../../components/Ticket'
+import ComprobanteChoice from '../../components/ComprobanteChoice'
+import { handleFiscalResult } from '../../utils/factura'
 
 const PAYMENT_METHODS = [
   { value: 'efectivo', label: 'Efectivo', icon: '💵' },
@@ -24,9 +26,11 @@ export default function ACobrar() {
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
   const [metodoPago, setMetodoPago] = useState('efectivo')
+  // false | 'fiscal' | 'mostrador' (comprobante que se está emitiendo)
   const [cobrando, setCobrando] = useState(false)
   const [ticket, setTicket] = useState(null)
   const inFlight = useRef(false)
+  const cobrandoRef = useRef(false)
 
   async function load({ silent = false } = {}) {
     if (inFlight.current) return
@@ -54,13 +58,17 @@ export default function ACobrar() {
     setMetodoPago('efectivo')
   }
 
-  async function confirmarCobro() {
-    if (!selected) return
-    setCobrando(true)
+  // tipo: 'fiscal' (Factura C ARCA) | 'mostrador'; doc: { doc_tipo, doc_nro } opcional
+  async function confirmarCobro(tipo, doc = {}) {
+    if (!selected || cobrandoRef.current) return
+    cobrandoRef.current = true
+    setCobrando(tipo)
     try {
-      const res = await api.post(`/pedidos-caja/${selected.id}/cobrar`, { metodo_pago: metodoPago })
+      const res = await api.post(`/pedidos-caja/${selected.id}/cobrar`, { metodo_pago: metodoPago, tipo_ticket: tipo, ...doc })
       toast.success(`Cobrado ${fmt(res.data.sale.total)}`)
       setTicket(res.data.sale)
+      // Factura autorizada → se imprime sola en la comandera; si ARCA falló, avisa
+      handleFiscalResult(res.data.sale)
       setSelected(null)
       setPedidos(prev => prev.filter(p => p.id !== selected.id))
       load({ silent: true })
@@ -72,6 +80,7 @@ export default function ACobrar() {
         load({ silent: true })
       }
     } finally {
+      cobrandoRef.current = false
       setCobrando(false)
     }
   }
@@ -132,7 +141,7 @@ export default function ACobrar() {
       {/* Modal de cobro */}
       {selected && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-6">
             <h2 className="text-lg font-bold text-[#111111] mb-0.5">
               Cobrar {selected.nombre_carrito || selected.cliente_nombre || `pedido #${selected.id}`}
             </h2>
@@ -145,7 +154,8 @@ export default function ACobrar() {
                 <button
                   key={m.value}
                   onClick={() => setMetodoPago(m.value)}
-                  className={`py-3 px-2 rounded-xl border text-sm font-semibold transition-colors ${
+                  disabled={!!cobrando}
+                  className={`min-h-[3rem] py-3 px-2 rounded-xl border text-sm font-semibold transition-colors ${
                     metodoPago === m.value
                       ? 'bg-mimi-500 border-mimi-500 text-white'
                       : 'bg-white border-[#E5E7EB] text-[#444444] hover:border-mimi-300'
@@ -155,14 +165,12 @@ export default function ACobrar() {
                 </button>
               ))}
             </div>
-            <div className="flex gap-2">
-              <button onClick={confirmarCobro} disabled={cobrando} className="btn-primary flex-1 py-3">
-                {cobrando ? 'Cobrando...' : '✓ Confirmar cobro'}
-              </button>
-              <button onClick={() => setSelected(null)} disabled={cobrando} className="btn-secondary flex-1 py-3">
+            <ComprobanteChoice key={selected.id} busy={cobrando} onChoose={confirmarCobro} />
+            {!cobrando && (
+              <button onClick={() => setSelected(null)} className="btn-secondary w-full mt-2 min-h-[3rem]">
                 Volver
               </button>
-            </div>
+            )}
           </div>
         </div>
       )}

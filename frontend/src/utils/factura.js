@@ -31,16 +31,19 @@ export function docHint(raw) {
 }
 
 /**
- * Luego de registrar una venta: si es fiscal y quedó autorizada, imprime la
- * factura en la comandera sin pedir otro toque; si ARCA falló, avisa.
+ * Luego de registrar una venta: imprime el ticket directo en la comandera
+ * (factura si ARCA la autorizó, ticket de mostrador si se eligió mostrador).
+ * Si la factura falló, avisa y devuelve false para que se muestre el ticket
+ * en pantalla con el botón "Reintentar facturación".
  * @param {object} sale - venta completa devuelta por el backend
+ * @returns {boolean} true si se imprimió y no hace falta mostrar el ticket
  */
-export function handleFiscalResult(sale) {
-  if (!isFiscal(sale)) return
-  if (isAutorizada(sale)) {
-    toast.success('Factura autorizada por ARCA')
-    printSaleTicket(sale).catch(() => toast.error('No se pudo imprimir la factura'))
-  } else {
+export function imprimirVenta(sale) {
+  if (isFiscal(sale) && !isAutorizada(sale)) {
     toast.error(`No se pudo facturar en ARCA${sale.factura_error ? `: ${sale.factura_error}` : ''}`, { duration: 6000 })
+    return false
   }
+  if (isAutorizada(sale)) toast.success('Factura autorizada por ARCA')
+  printSaleTicket(sale).catch(() => toast.error('No se pudo imprimir el ticket'))
+  return true
 }

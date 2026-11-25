@@ -6,7 +6,7 @@ import ClienteModal from '../../components/pos/ClienteModal'
 import WeightPopup from '../../components/pos/WeightPopup'
 import CartTabs from '../../components/pos/CartTabs'
 import CartItemRow from '../../components/pos/CartItemRow'
-import { handleFiscalResult, TIPO_MOSTRADOR } from '../../utils/factura'
+import { imprimirVenta, TIPO_MOSTRADOR } from '../../utils/factura'
 import { useAuth } from '../../context/AuthContext'
 import { STORAGE_KEY, makeCart, nextClienteName, loadInitial } from '../../utils/posCarts'
 
@@ -259,11 +259,11 @@ export default function POS() {
         items: saleCart.items.map(i => ({ product_id: i.product_id, cantidad: i.es_peso ? i.gramos : i.cantidad })),
       })
       setShowModal(false)
-      setTicket(res.data)
       closeCart(saleCart.id)
       toast.success('¡Venta registrada!')
-      // Factura autorizada → se imprime sola en la comandera; si ARCA falló, avisa
-      handleFiscalResult(res.data)
+      // Se imprime directo en la comandera y el carrito queda limpio;
+      // solo si ARCA falló se muestra el ticket para reintentar
+      if (!imprimirVenta(res.data)) setTicket(res.data)
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error al registrar venta')
       // Se asignó un cajero al local: pasamos a modo "Enviar a caja"

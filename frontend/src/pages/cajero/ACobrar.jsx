@@ -3,7 +3,7 @@ import api from '../../services/api'
 import toast from 'react-hot-toast'
 import Ticket from '../../components/Ticket'
 import ComprobanteChoice from '../../components/ComprobanteChoice'
-import { handleFiscalResult } from '../../utils/factura'
+import { imprimirVenta } from '../../utils/factura'
 
 const PAYMENT_METHODS = [
   { value: 'efectivo', label: 'Efectivo', icon: '💵' },
@@ -66,9 +66,8 @@ export default function ACobrar() {
     try {
       const res = await api.post(`/pedidos-caja/${selected.id}/cobrar`, { metodo_pago: metodoPago, tipo_ticket: tipo, ...doc })
       toast.success(`Cobrado ${fmt(res.data.sale.total)}`)
-      setTicket(res.data.sale)
-      // Factura autorizada → se imprime sola en la comandera; si ARCA falló, avisa
-      handleFiscalResult(res.data.sale)
+      // Se imprime directo en la comandera; solo si ARCA falló se muestra el ticket para reintentar
+      if (!imprimirVenta(res.data.sale)) setTicket(res.data.sale)
       setSelected(null)
       setPedidos(prev => prev.filter(p => p.id !== selected.id))
       load({ silent: true })
